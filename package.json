@@ -1,0 +1,17 @@
+{
+  "name": "survey-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "South Wales Social Well-Being Scale Survey — GraphQL research platform",
+  "workspaces": [
+    "server"
+  ],
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:migrate": "npm run db:migrate -w server",
+    "db:seed": "npm run db:seed -w server",
+    "db:studio": "npm run db:studio -w server"
+  },
+  "license": "MIT"
+}
