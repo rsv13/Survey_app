@@ -13,5 +13,11 @@
     "db:seed": "npm run db:seed -w server",
     "db:studio": "npm run db:studio -w server"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "allowScripts": {
+    "@prisma/engines@7.10.0": true,
+    "esbuild@0.28.2": true,
+    "prisma@7.10.0": true,
+    "fsevents@2.3.3": true
+  }
 }
