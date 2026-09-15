@@ -1,18 +1,29 @@
+// schema.prisma
+// This file defines the whole database: every table, column, and relationship.
+// Prisma reads it to (1) create the tables (migrations) and (2) generate a
+// type-safe client our code uses. Read it top to bottom to understand the data.
+
+// Generates the type-safe Prisma Client into src/generated/prisma.
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
 }
 
+// The database we connect to. The connection URL lives in prisma.config.ts.
 datasource db {
   provider = "postgresql"
 }
 
+// ---------- Enums: fixed lists of allowed values, enforced by the database ----------
+
+// The three kinds of user.
 enum Role {
   NORMAL_USER
   GROUP_ADMIN
   ADMIN
 }
 
+// Demographic: gender options.
 enum Gender {
   MALE
   FEMALE
@@ -20,6 +31,7 @@ enum Gender {
   OTHERS
 }
 
+// Demographic: age bands.
 enum AgeGroup {
   AGE_16_24
   AGE_25_34
@@ -29,6 +41,7 @@ enum AgeGroup {
   AGE_65_PLUS
 }
 
+// The 5-point scale used to answer each well-being question.
 enum AnswerScale {
   NONE_OF_THE_TIME
   RARELY
@@ -37,46 +50,59 @@ enum AnswerScale {
   ALL_OF_THE_TIME
 }
 
+// What a verification token is for.
 enum TokenType {
   EMAIL_VERIFICATION
   PASSWORD_RESET
 }
 
-model User {
-  id            String           @id @default(cuid())
-  username      String           @unique
-  email         String           @unique
-  passwordHash  String?
-  role          Role             @default(NORMAL_USER)
-  avatar        String           @default("default")
-  emailVerified Boolean          @default(false)
-  responses     SurveyResponse[]
+// ---------- Models (tables) ----------
 
+// A person who uses the app (participant, group admin, or admin).
+model User {
+  id           String  @id @default(cuid())
+  username     String  @unique
+  email        String  @unique
+  passwordHash String? // bcrypt hash, never the real password
+  role         Role    @default(NORMAL_USER)
+  avatar       String  @default("default") // key/emoji for a preloaded avatar, not a real photo
+
+  emailVerified Boolean @default(false) // can't use the app until they confirm their email
+
+  responses SurveyResponse[] // every survey this user has submitted
+
+  // A confidential, sequential handle (SWSWBS0001...) built from surveyNumber.
   surveyNumber   Int    @unique @default(autoincrement())
   surveyUsername String @unique
 
-  groupId            String?
-  group              Group?              @relation("GroupMembers", fields: [groupId], references: [id])
-  adminOfGroups      Group[]             @relation("GroupAdmins")
-  createdGroups      Group[]             @relation("GroupCreator")
+  // Group links: a user is a member of one group, and can admin/create many.
+  groupId       String?
+  group         Group?  @relation("GroupMembers", fields: [groupId], references: [id])
+  adminOfGroups Group[] @relation("GroupAdmins")
+  createdGroups Group[] @relation("GroupCreator")
+
+  // Auth tokens belonging to this user.
   refreshTokens      RefreshToken[]
   verificationTokens VerificationToken[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  deletedAt DateTime? // soft delete: set a date instead of removing the row
 
   @@index([groupId])
   @@index([role])
 }
 
+// A group of participants, run by a group admin.
 model Group {
-  id          String           @id @default(cuid())
-  name        String           @unique
+  id          String @id @default(cuid())
+  name        String @unique
   description String
-  inviteCode  String           @unique
-  responses   SurveyResponse[]
+  inviteCode  String @unique // members join the group using this code
 
+  responses SurveyResponse[] // all responses from this group's members
+
+  // Who owns/admins the group.
   creatorId String
   creator   User   @relation("GroupCreator", fields: [creatorId], references: [id])
   admins    User[] @relation("GroupAdmins")
@@ -87,38 +113,44 @@ model Group {
   deletedAt DateTime?
 }
 
+// One of the 14 well-being questions. Stored as data so wording can change without a code change.
 model SurveyQuestion {
   id      String         @id @default(cuid())
-  order   Int            @unique
+  order   Int            @unique // display order, 1..14
   text    String
   active  Boolean        @default(true)
   answers SurveyAnswer[]
 }
 
+// An editable dropdown option (sector or education). `category` groups them.
 model SurveyOption {
   id       String  @id @default(cuid())
-  category String
+  category String // "SECTOR" or "EDUCATION"
   label    String
   order    Int
   active   Boolean @default(true)
 
+  // A response links here twice — once for sector, once for education.
   sectorResponses    SurveyResponse[] @relation("Sector")
   educationResponses SurveyResponse[] @relation("Education")
 
-  @@unique([category, label])
+  @@unique([category, label]) // no duplicate labels within a category
   @@index([category])
 }
 
+// One completed survey submission (demographics + 14 answers).
 model SurveyResponse {
   id       String @id @default(cuid())
-  publicId String @unique @default(cuid())
+  publicId String @unique @default(cuid()) // unguessable id used in URLs/exports
 
+  // Who submitted it. Nullable so a response survives if the user is anonymised (GDPR).
   userId         String?
   user           User?   @relation(fields: [userId], references: [id])
   groupId        String?
   group          Group?  @relation(fields: [groupId], references: [id])
-  surveyUsername String
+  surveyUsername String // snapshot of the pseudonym, kept stable for exports
 
+  // Demographics.
   gender      Gender
   ageGroup    AgeGroup
   sectorId    String
@@ -143,39 +175,42 @@ model SurveyResponse {
   @@index([createdAt])
 }
 
+// One answer to one question within one response (one row per question).
 model SurveyAnswer {
   id           String         @id @default(cuid())
   responseId   String
   response     SurveyResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
   questionId   String
   question     SurveyQuestion @relation(fields: [questionId], references: [id])
-  value        AnswerScale
-  numericValue Int
+  value        AnswerScale // the label, e.g. OFTEN
+  numericValue Int // the 0..4 number, stored for fast averaging
 
-  @@unique([responseId, questionId])
+  @@unique([responseId, questionId]) // one answer per question per response
   @@index([questionId])
 }
 
+// A long-lived token that keeps a user logged in (stored hashed).
 model RefreshToken {
   id        String    @id @default(cuid())
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String    @unique
+  tokenHash String    @unique // we store only the hash, never the raw token
   expiresAt DateTime
-  revokedAt DateTime?
+  revokedAt DateTime? // set when the session is logged out
   createdAt DateTime  @default(now())
 
   @@index([userId])
 }
 
+// A single-use token for verifying an email or resetting a password (stored hashed).
 model VerificationToken {
   id         String    @id @default(cuid())
   userId     String
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   tokenHash  String    @unique
-  type       TokenType
+  type       TokenType // EMAIL_VERIFICATION or PASSWORD_RESET
   expiresAt  DateTime
-  consumedAt DateTime?
+  consumedAt DateTime? // set once used, so it can't be reused
   createdAt  DateTime  @default(now())
 
   @@index([userId])

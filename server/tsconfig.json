@@ -1,18 +1,19 @@
 {
+  // TypeScript settings for the server. Strict mode is on to catch bugs early.
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
+    "target": "ES2022", // compile down to modern JavaScript
+    "module": "NodeNext", // use modern Node ES modules (import/export)
     "moduleResolution": "NodeNext",
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
+    "strict": true, // turn on all strict type checks (including null-safety)
+    "noUncheckedIndexedAccess": true, // array[i] is typed as "value OR undefined"
     "esModuleInterop": true,
-    "skipLibCheck": true,
+    "skipLibCheck": true, // don't type-check inside node_modules (faster)
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
+    "resolveJsonModule": true, // allow importing .json files as data
     "sourceMap": true,
-    "outDir": "dist",
+    "outDir": "dist", // where compiled output would go
     "rootDir": "."
   },
-  "include": ["src/**/*", "prisma/**/*", "prisma.config.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*", "prisma/**/*", "prisma.config.ts"], // files TypeScript should check
+  "exclude": ["node_modules", "dist"] // folders to ignore
 }

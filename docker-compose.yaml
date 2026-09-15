@@ -1,21 +1,28 @@
+# docker-compose.yaml
+# Runs PostgreSQL 16 in a container so we don't have to install it on the Mac.
+# Start it with:  docker compose up -d   (or: npm run db:up)
+# Stop it with:   docker compose down    (or: npm run db:down)
+
 services:
   db:
-    image: postgres:16
+    image: postgres:16 # pinned to version 16 so everyone runs the same engine
     container_name: swswbs_db
-    restart: unless-stopped
+    restart: unless-stopped # bring the container back automatically if it stops
     environment:
+      # These three MUST match the DATABASE_URL in server/.env
       POSTGRES_USER: swswbs
-      POSTGRES_PASSWORD: swswbs_dev_password
+      POSTGRES_PASSWORD: swswbs_dev_password # local dev only — never use in production
       POSTGRES_DB: swswbs
     ports:
-      - "5432:5432"
+      - "5432:5432" # connect from the Mac at localhost:5432
     volumes:
-      - swswbs_pgdata:/var/lib/postgresql/data
+      - swswbs_pgdata:/var/lib/postgresql/data # keep the data even if the container is recreated
     healthcheck:
+      # lets tools wait until Postgres is actually ready to accept connections
       test: ["CMD-SHELL", "pg_isready -U swswbs -d swswbs"]
       interval: 5s
       timeout: 5s
       retries: 5
 
 volumes:
-  swswbs_pgdata:
+  swswbs_pgdata: # the named volume where the database files are stored
