@@ -1,4 +1,3 @@
-// src/index.ts
 // Starts the GraphQL server: ties the schema and resolvers together and listens.
 
 import 'dotenv/config'; // load server/.env FIRST, before anything reads process.env
@@ -7,14 +6,15 @@ import { startStandaloneServer } from '@apollo/server/standalone';
 
 import { typeDefs } from './schema.js';       // the "menu" (what can be queried)
 import { resolvers } from './resolvers.js';   // the "kitchen" (how data is fetched)
+import { buildContext, type Context } from './context.js'; // per-request auth context
 
-// Build the server from the schema + resolvers.
-const server = new ApolloServer({ typeDefs, resolvers });
+// The <Context> tells Apollo (and TypeScript) the shape of context every resolver gets.
+const server = new ApolloServer<Context>({ typeDefs, resolvers });
 
-// Start listening on port 4000. This also serves Apollo Sandbox (a query
-// playground) at the same URL, which we'll use to test the query.
+// Start listening on port 4000. `context` runs on every request to read the token.
 const { url } = await startStandaloneServer(server, {
   listen: { port: 4000 },
+  context: buildContext,
 });
 
 console.log(`GraphQL server ready at ${url}`);
