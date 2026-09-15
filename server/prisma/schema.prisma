@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  NORMAL_USER
+  GROUP_ADMIN
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  PREFER_NOT_TO_SAY
+  OTHERS
+}
+
+enum AgeGroup {
+  AGE_16_24
+  AGE_25_34
+  AGE_35_44
+  AGE_45_54
+  AGE_55_64
+  AGE_65_PLUS
+}
+
+enum AnswerScale {
+  NONE_OF_THE_TIME
+  RARELY
+  SOME_OF_THE_TIME
+  OFTEN
+  ALL_OF_THE_TIME
+}
