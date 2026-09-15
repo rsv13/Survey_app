@@ -5,19 +5,22 @@
   "type": "module",
   "scripts": {
     "db:migrate": "prisma migrate dev",
-        "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
-    "db:reset": "prisma migrate reset"
+    "db:reset": "prisma migrate reset",
+    "dev": "tsx watch src/index.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@apollo/server": "^5.5.1",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "bcryptjs": "^2.4.3",
     "dotenv": "^17.4.2",
+    "graphql": "^16.14.2",
     "pg": "^8.23.0"
   },
   "devDependencies": {
