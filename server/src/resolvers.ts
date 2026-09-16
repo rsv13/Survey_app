@@ -10,6 +10,7 @@ import {
   createVerificationToken,
   hashToken,
 } from './lib/auth.js';
+import crypto from 'node:crypto';
 
 // Argument shapes (match the schema inputs).
 interface SignUpArgs { input: { username: string; email: string; password: string } }
@@ -47,6 +48,29 @@ function formatSurveyUsername(n: number): string {
   return `SWSWBS${String(n).padStart(4, '0')}`;
 }
 
+// A short, human-friendly invite code. We drop easily-confused characters
+// (no O/0, no I/1) so codes are easy to read out and type without mistakes.
+const INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function generateInviteCode(length = 8): string {
+  let code = '';
+  for (let i = 0; i < length; i++) {
+    code += INVITE_ALPHABET[crypto.randomInt(INVITE_ALPHABET.length)];
+  }
+  return code;
+}
+
+// Keep generating until we get one no group is using (invite codes are unique).
+async function uniqueInviteCode(): Promise<string> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = generateInviteCode();
+    const clash = await prisma.group.findUnique({ where: { inviteCode: code } });
+    if (!clash) return code;
+  }
+  throw new GraphQLError('Could not generate a unique invite code — please try again.', {
+    extensions: { code: 'INTERNAL_SERVER_ERROR' },
+  });
+}
+
 // Load the logged-in user, or throw if there's no valid token.
 async function requireUser(context: Context) {
   if (!context.userId) {
@@ -55,6 +79,18 @@ async function requireUser(context: Context) {
   const user = await prisma.user.findUnique({ where: { id: context.userId } });
   if (!user) {
     throw new GraphQLError('User not found.', { extensions: { code: 'UNAUTHENTICATED' } });
+  }
+  return user;
+}
+
+// Load the logged-in user AND ensure they're the site admin, else throw.
+// Reused by every ADMIN-only mutation.
+async function requireAdmin(context: Context) {
+  const user = await requireUser(context);
+  if (user.role !== 'ADMIN') {
+    throw new GraphQLError('Only a site admin can do that.', {
+      extensions: { code: 'FORBIDDEN' },
+    });
   }
   return user;
 }
@@ -228,6 +264,8 @@ export const resolvers = {
         numericValue: SCALE_TO_NUMBER[a.value] ?? 0,
       }));
 
+      
+
       // Nested create = one automatic transaction (response + answers together).
       return prisma.surveyResponse.create({
         data: {
@@ -248,7 +286,85 @@ export const resolvers = {
         include: responseInclude,
       });
     },
+    // --- Groups ---
+
+    // Site admin promotes a normal user to Group Admin. This is the ONE
+    // privileged trust grant — no other mutation hands out this role.
+    grantGroupAdmin: async (
+      _parent: unknown,
+      args: { email: string },
+      context: Context,
+    ) => {
+      await requireAdmin(context); // only a site admin may reach past this line
+
+      const target = await prisma.user.findUnique({ where: { email: args.email } });
+      if (!target) {
+        throw new GraphQLError('No user found with that email.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+      if (target.role === 'ADMIN') {
+        // Don't quietly downgrade a fellow site admin.
+        throw new GraphQLError('That user is already a site admin.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+      if (target.role === 'GROUP_ADMIN') {
+        return target; // already a group admin — nothing to do (safe to call twice)
+      }
+
+      return prisma.user.update({
+        where: { id: target.id },
+        data: { role: 'GROUP_ADMIN' },
+      });
+    },
+        // Create a group. Allowed for a site admin OR a group admin (who can run
+    // several cohorts). The caller becomes the group's creator and first admin.
+    createGroup: async (
+      _parent: unknown,
+      args: { input: { name: string; description: string } },
+      context: Context,
+    ) => {
+      const user = await requireUser(context);
+      if (user.role !== 'ADMIN' && user.role !== 'GROUP_ADMIN') {
+        throw new GraphQLError('Only a group admin or site admin can create a group.', {
+          extensions: { code: 'FORBIDDEN' },
+        });
+      }
+
+      const name = args.input.name.trim();
+      const description = args.input.description.trim();
+      if (!name || !description) {
+        throw new GraphQLError('A group needs both a name and a description.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+
+      const taken = await prisma.group.findUnique({ where: { name } });
+      if (taken) {
+        throw new GraphQLError('A group with that name already exists.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+
+      const inviteCode = await uniqueInviteCode();
+
+      // Nested write: create the group AND link the creator + first admin in
+      // one atomic step. `connect` attaches existing User rows to the relations.
+      return prisma.group.create({
+        data: {
+          name,
+          description,
+          inviteCode,
+          creator: { connect: { id: user.id } },
+          admins: { connect: { id: user.id } },
+        },
+      });
+    },
   },
+
+
+  
 
   // Computed fields on SurveyResponse.
   SurveyResponse: {
@@ -280,5 +396,26 @@ export const resolvers = {
 
     // The DB gives a Date; the schema field is String!, so convert to ISO text.
     createdAt: (parent: { createdAt: Date }) => parent.createdAt.toISOString(),
+  },
+  // Computed fields on Group.
+  Group: {
+    // Count members on demand (users whose groupId points at this group).
+    memberCount: (parent: { id: string }) =>
+      prisma.user.count({ where: { groupId: parent.id, deletedAt: null } }),
+
+    // Fetch the creator row from the stored creatorId.
+    creator: (parent: { creatorId: string }) =>
+      prisma.user.findUnique({ where: { id: parent.creatorId } }),
+
+    // DB gives a Date; the schema field is String!, so convert to ISO text.
+    createdAt: (parent: { createdAt: Date }) => parent.createdAt.toISOString(),
+  },
+
+  // A user's group membership (null if they belong to none).
+  User: {
+    group: (parent: { groupId: string | null }) =>
+      parent.groupId
+        ? prisma.group.findUnique({ where: { id: parent.groupId } })
+        : null,
   },
 };

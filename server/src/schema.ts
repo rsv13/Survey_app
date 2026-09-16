@@ -40,6 +40,7 @@ export const typeDefs = `#graphql
     emailVerified: Boolean!
     surveyUsername: String!
     avatar: String!
+    group: Group # the group this user belongs to, if any (null = individual)
   }
 
   type AuthPayload {
@@ -56,6 +57,38 @@ export const typeDefs = `#graphql
   input SignInInput {
     email: String!
     password: String!
+  }
+
+    # ---------- Groups (Phase 4) ----------
+
+  # A group gathers participants under one or more Group Admins so their responses can be analysed together.
+
+  type Group {
+    id: ID!
+    name: String!
+    description: String!
+    inviteCode: String!     # the code a member enters to join
+    creator: User!          # who created the group
+    memberCount: Int!       # computed on demand, like totalScore
+    createdAt: String!
+  }
+
+  input CreateGroupInput {
+    name: String!
+    description: String!
+  }
+
+  # A group admin adds a co-admin to one of their groups. The person must
+  # ALREADY be a group admin (granted by the site admin) — this only shares
+  # a group, it never hands out the role.
+  input AddGroupAdminInput {
+    email: String!
+    groupId: ID!
+  }
+
+  input ReassignMemberInput {
+    userId: ID!
+    groupId: ID!
   }
 
   # ---------- Survey responses (Phase 3) ----------
@@ -133,5 +166,13 @@ export const typeDefs = `#graphql
     verifyEmail(token: String!): AuthPayload!
     signIn(input: SignInInput!): AuthPayload!
     submitSurvey(input: SubmitSurveyInput!): SurveyResponse! # create a response + its answers
+    # --- Groups ---
+    grantGroupAdmin(email: String!): User!               # ADMIN only — elevate a normal user to Group Admin
+    createGroup(input: CreateGroupInput!): Group!        # ADMIN or GROUP_ADMIN — create a group you own
+    addGroupAdmin(input: AddGroupAdminInput!): Group!    # a group's admin adds a co-admin (already a Group Admin)
+    reassignMember(input: ReassignMemberInput!): User!   # ADMIN only — move a user between groups
+    joinGroup(inviteCode: String!): Group!               # any signed-in user joins as a member
+    leaveGroup: User!                                    # a member leaves their own group
+    removeMember(userId: ID!): User!                     # a Group Admin removes a member from their group
   }
 `;
