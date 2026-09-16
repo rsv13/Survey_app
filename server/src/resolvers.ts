@@ -318,7 +318,7 @@ export const resolvers = {
         data: { role: 'GROUP_ADMIN' },
       });
     },
-        // Create a group. Allowed for a site admin OR a group admin (who can run
+    // Create a group. Allowed for a site admin OR a group admin (who can run
     // several cohorts). The caller becomes the group's creator and first admin.
     createGroup: async (
       _parent: unknown,
@@ -361,10 +361,54 @@ export const resolvers = {
         },
       });
     },
+
+    // Any signed-in user joins a group using its invite code.
+    joinGroup: async (
+      _parent: unknown,
+      args: { inviteCode: string },
+      context: Context,
+    ) => {
+      const user = await requireUser(context);
+
+      // Must leave a current group before joining another. This keeps
+      // membership unambiguous and is how a wrong-code join gets corrected:
+      // leave, then join with the right code.
+      if (user.groupId) {
+        throw new GraphQLError('You are already in a group. Leave it before joining another.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+
+      // Normalise the typed code so stray spaces / lower-case still match.
+      const code = args.inviteCode.trim().toUpperCase();
+      const group = await prisma.group.findUnique({ where: { inviteCode: code } });
+      if (!group || group.deletedAt) {
+        throw new GraphQLError('That invite code is not valid.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { groupId: group.id },
+      });
+      return group; // memberCount will now read one higher
+    },
+
+    // A member leaves their own group (membership back to none).
+    leaveGroup: async (_parent: unknown, _args: unknown, context: Context) => {
+      const user = await requireUser(context);
+      if (!user.groupId) {
+        throw new GraphQLError('You are not currently in a group.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+      return prisma.user.update({
+        where: { id: user.id },
+        data: { groupId: null },
+      });
+    },
   },
-
-
-  
 
   // Computed fields on SurveyResponse.
   SurveyResponse: {
