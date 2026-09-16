@@ -489,6 +489,9 @@ export const resolvers = {
         });
       }
 
+      
+      
+
       const group = await prisma.group.findUnique({
         where: { id: target.groupId },
         include: { admins: { select: { id: true } } },
@@ -518,6 +521,36 @@ export const resolvers = {
       return prisma.user.update({
         where: { id: target.id },
         data: { groupId: null },
+      });
+    },
+
+      // Site admin moves a user into a group (e.g. correcting a wrong-code join
+    // centrally). It reaches across any groups, so it's strictly ADMIN-only.
+    reassignMember: async (
+      _parent: unknown,
+      args: { input: { userId: string; groupId: string } },
+      context: Context,
+    ) => {
+      await requireAdmin(context); // only the site admin, reusing our helper
+      const { userId, groupId } = args.input;
+
+      const target = await prisma.user.findUnique({ where: { id: userId } });
+      if (!target) {
+        throw new GraphQLError('No user found with that id.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+
+      const group = await prisma.group.findUnique({ where: { id: groupId } });
+      if (!group || group.deletedAt) {
+        throw new GraphQLError('Group not found.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+
+      return prisma.user.update({
+        where: { id: userId },
+        data: { groupId },
       });
     },
   },
