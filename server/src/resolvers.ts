@@ -408,6 +408,118 @@ export const resolvers = {
         data: { groupId: null },
       });
     },
+
+        // A group's own admin adds a co-admin. Two guards: the caller must admin
+    // this group (or be the site admin), and the person being added must ALREADY
+    // be a group admin — this shares a group, it never hands out the role.
+    addGroupAdmin: async (
+      _parent: unknown,
+      args: { input: { email: string; groupId: string } },
+      context: Context,
+    ) => {
+      const caller = await requireUser(context);
+      const { email, groupId } = args.input;
+
+      const group = await prisma.group.findUnique({
+        where: { id: groupId },
+        include: { admins: { select: { id: true } } },
+      });
+      if (!group || group.deletedAt) {
+        throw new GraphQLError('Group not found.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+
+        
+      }
+
+      // Caller must be the site admin OR already an admin of THIS group.
+      const callerAdminsThisGroup = group.admins.some((a) => a.id === caller.id);
+      if (caller.role !== 'ADMIN' && !callerAdminsThisGroup) {
+        throw new GraphQLError('Only an admin of this group can add a co-admin.', {
+          extensions: { code: 'FORBIDDEN' },
+        });
+      }
+
+      const target = await prisma.user.findUnique({ where: { email } });
+      if (!target) {
+        throw new GraphQLError('No user found with that email.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+
+      // The person must already hold the group-admin role (granted by the site
+      // admin). This is the guard that stops co-admin adds becoming a backdoor.
+      if (target.role !== 'GROUP_ADMIN') {
+        throw new GraphQLError(
+          'That user must be granted group-admin access by the site admin first.',
+          { extensions: { code: 'BAD_USER_INPUT' } },
+        );
+      }
+
+      // Already a co-admin here? Nothing to do (safe to call twice).
+      if (group.admins.some((a) => a.id === target.id)) {
+        return group;
+      }
+
+      return prisma.group.update({
+        where: { id: groupId },
+        data: { admins: { connect: { id: target.id } } },
+      });
+    },
+
+    // A group's admin removes a member from THEIR group (clears the member's
+    // groupId). Group admins can remove ordinary members of their own group;
+    // removing another admin is reserved for the site admin.
+    removeMember: async (
+      _parent: unknown,
+      args: { userId: string },
+      context: Context,
+    ) => {
+      const caller = await requireUser(context);
+
+      const target = await prisma.user.findUnique({ where: { id: args.userId } });
+      if (!target) {
+        throw new GraphQLError('No user found with that id.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+      if (!target.groupId) {
+        throw new GraphQLError('That user is not in any group.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+
+      const group = await prisma.group.findUnique({
+        where: { id: target.groupId },
+        include: { admins: { select: { id: true } } },
+      });
+      if (!group) {
+        throw new GraphQLError('Group not found.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+
+      // Caller must be the site admin OR an admin of this group.
+      const callerAdminsGroup = group.admins.some((a) => a.id === caller.id);
+      if (caller.role !== 'ADMIN' && !callerAdminsGroup) {
+        throw new GraphQLError('Only an admin of this group can remove a member.', {
+          extensions: { code: 'FORBIDDEN' },
+        });
+      }
+
+      // A co-admin can't remove a fellow admin — only the site admin can.
+      const targetIsAdmin = group.admins.some((a) => a.id === target.id);
+      if (targetIsAdmin && caller.role !== 'ADMIN') {
+        throw new GraphQLError('Only the site admin can remove another admin.', {
+          extensions: { code: 'FORBIDDEN' },
+        });
+      }
+
+      return prisma.user.update({
+        where: { id: target.id },
+        data: { groupId: null },
+      });
+    },
   },
 
   // Computed fields on SurveyResponse.
