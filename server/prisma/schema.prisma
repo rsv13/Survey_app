@@ -119,6 +119,7 @@ model SurveyQuestion {
   order   Int            @unique // display order, 1..14
   text    String
   active  Boolean        @default(true)
+  factor  Int?
   answers SurveyAnswer[]
 }
 

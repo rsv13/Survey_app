@@ -14,6 +14,7 @@ export const typeDefs = `#graphql
     id: ID!
     order: Int!
     text: String!
+    factor: Int
   }
 
   type SurveyOption {
@@ -66,6 +67,20 @@ export const typeDefs = `#graphql
     numericValue: Int!
   }
 
+  # A per-factor (subscale) score for one response.
+  type SubscaleScore {
+    factor: Int!
+    name: String!
+    score: Int!
+  }
+
+  # Whether the current user may submit now, and when they next can.
+  type SurveyEligibility {
+    canSubmit: Boolean!
+    nextEligibleAt: String
+    cooldownDays: Int!
+  }
+
   # A completed survey submission.
   type SurveyResponse {
     id: ID!
@@ -81,6 +96,7 @@ export const typeDefs = `#graphql
     consent: Boolean!
     answers: [SurveyAnswer!]!
     totalScore: Int! # sum of the answers' numeric values (computed, not stored)
+    subscaleScores: [SubscaleScore!]!
     createdAt: String!
   }
 
@@ -109,6 +125,7 @@ export const typeDefs = `#graphql
     surveyDefinition: SurveyDefinition!
     me: User
     surveyResponses: [SurveyResponse!]! # role-scoped: admin=all, group admin=their group, user=their own
+    surveyEligibility: SurveyEligibility!
   }
 
   type Mutation {

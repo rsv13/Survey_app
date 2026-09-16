@@ -78,6 +78,16 @@ const EDUCATION_LEVELS: string[] = [
   'Postdoctoral Studies',
 ];
 
+// Which of the 3 validated factors (subscales) each question belongs to,
+// keyed by question order (from the SWSWBS User Guide, Fig. 2):
+//   F1 Safe & inclusive interaction:            items 1, 7, 8, 10, 11, 12
+//   F2 Learning, helping & feeling useful:      items 5, 9, 13, 14
+//   F3 Security, worthwhile activities, family: items 2, 3, 4, 6
+const QUESTION_FACTOR: Record<number, number> = {
+  1: 1, 2: 3, 3: 3, 4: 3, 5: 2, 6: 3, 7: 1,
+  8: 1, 9: 2, 10: 1, 11: 1, 12: 1, 13: 2, 14: 2,
+};
+
 // Build "SWSWBS0001" from the numeric survey number.
 function formatSurveyUsername(n: number): string {
   return `SWSWBS${String(n).padStart(4, '0')}`;
@@ -89,10 +99,11 @@ async function main() {
   // 1) Questions — keyed by `order`, so re-running updates instead of duplicating.
   for (let i = 0; i < QUESTIONS.length; i++) {
     const order = i + 1;
+    const factor = QUESTION_FACTOR[order];
     await prisma.surveyQuestion.upsert({
       where: { order },
-      update: { text: QUESTIONS[i]!, active: true },
-      create: { order, text: QUESTIONS[i]!, active: true },
+      update: { text: QUESTIONS[i]!, active: true, factor },
+      create: { order, text: QUESTIONS[i]!, active: true, factor },
     });
   }
   console.log(`  ${QUESTIONS.length} questions`);
