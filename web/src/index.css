@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+/* Expose our Ocean tokens to Tailwind so utilities like bg-surface / text-ink
+   follow the theme automatically. */
+@theme inline {
+  --color-plane: var(--plane);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-calm: var(--calm);
+  --color-calm-deep: var(--calm-deep);
+  --color-calm-soft: var(--calm-soft);
+}
+
+/* Ocean — light (default) */
+:root {
+  --plane:#eef2f7; --surface:#ffffff; --surface-2:#e2ebf3;
+  --ink:#1b2430; --ink-2:#465264; --muted:#77839a; --border:rgba(27,36,48,.10);
+  --brand:#c61436; --brand-strong:#a71030;
+  --calm:#4472ca; --calm-deep:#0a369d; --calm-soft:#cfdee7;
+}
+/* Ocean — dark, following the system unless a light choice is stamped */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --plane:#0f1622; --surface:#17202e; --surface-2:#1e2937;
+    --ink:#e9eef5; --ink-2:#b3bece; --muted:#8593a8; --border:rgba(255,255,255,.10);
+    --brand:#e2647c; --brand-strong:#ec7f93;
+    --calm:#6f9bea; --calm-deep:#9cc0f7; --calm-soft:#1a2740;
+  }
+}
+/* Ocean — dark, explicit toggle */
+:root[data-theme="dark"] {
+  --plane:#0f1622; --surface:#17202e; --surface-2:#1e2937;
+  --ink:#e9eef5; --ink-2:#b3bece; --muted:#8593a8; --border:rgba(255,255,255,.10);
+  --brand:#e2647c; --brand-strong:#ec7f93;
+  --calm:#6f9bea; --calm-deep:#9cc0f7; --calm-soft:#1a2740;
+}
+
+html, body, #root { min-height: 100%; }
+body { background: var(--plane); color: var(--ink); }

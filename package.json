@@ -4,7 +4,7 @@
   "private": true,
   "description": "South Wales Social Well-Being Scale Survey — GraphQL research platform",
   "workspaces": [
-    "server"
+    "server", "web"
   ],
   "scripts": {
     "db:up": "docker compose up -d",
