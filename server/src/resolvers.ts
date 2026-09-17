@@ -475,6 +475,107 @@ export const resolvers = {
 
       return { dimension: args.dimension, segments };
     },
+
+    // SPSS-friendly CSV export (wide format: one row per response). Returned as
+    // text; the client turns it into a download. GROUP_ADMIN (their groups) or ADMIN.
+    exportResponsesCsv: async (
+      _parent: unknown,
+      args: { groupId?: string | null },
+      context: Context,
+    ) => {
+      const user = await requireUser(context);
+      if (user.role !== 'ADMIN' && user.role !== 'GROUP_ADMIN') {
+        throw new GraphQLError('Only a group admin or site admin can export data.', {
+          extensions: { code: 'FORBIDDEN' },
+        });
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const where: any = { deletedAt: null };
+      if (user.role === 'GROUP_ADMIN') {
+        const adminGroups = await prisma.group.findMany({
+          where: { admins: { some: { id: user.id } }, deletedAt: null },
+          select: { id: true },
+        });
+        const ids = adminGroups.map((g) => g.id);
+        if (args.groupId) {
+          if (!ids.includes(args.groupId)) {
+            throw new GraphQLError('You do not administer that group.', {
+              extensions: { code: 'FORBIDDEN' },
+            });
+          }
+          where.groupId = args.groupId;
+        } else {
+          where.groupId = { in: ids.length ? ids : ['__none__'] };
+        }
+      } else if (args.groupId) {
+        where.groupId = args.groupId;
+      }
+
+      const responses = await prisma.surveyResponse.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+        select: {
+          surveyUsername: true, createdAt: true,
+          gender: true, ageGroup: true, designation: true,
+          country: true, state: true, city: true, consent: true,
+          sector: { select: { label: true } },
+          education: { select: { label: true } },
+          group: { select: { name: true } },
+          answers: { select: { numericValue: true, question: { select: { order: true, factor: true } } } },
+        },
+      });
+
+      const GENDER_LABELS: Record<string, string> = {
+        MALE: 'Male', FEMALE: 'Female', PREFER_NOT_TO_SAY: 'Prefer not to say', OTHERS: 'Other',
+      };
+      const AGE_LABELS: Record<string, string> = {
+        AGE_16_24: '16-24', AGE_25_34: '25-34', AGE_35_44: '35-44',
+        AGE_45_54: '45-54', AGE_55_64: '55-64', AGE_65_PLUS: '65+',
+      };
+      // Quote a cell only if it contains a comma, quote, or newline (RFC 4180).
+      const csv = (v: unknown) => {
+        const t = v === null || v === undefined ? '' : String(v);
+        return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+      };
+
+      const header = [
+        'survey_username', 'group', 'submitted_at',
+        'gender', 'age_group', 'sector', 'education', 'designation',
+        'country', 'state', 'city', 'consent',
+        ...Array.from({ length: TOTAL_ITEMS }, (_, i) => `q${i + 1}`),
+        'answered', 'total_score', 'factor1_mean', 'factor2_mean', 'factor3_mean',
+      ];
+
+      const rows = responses.map((r) => {
+        const items: (number | null)[] = Array(TOTAL_ITEMS).fill(null);
+        const fAgg: Record<number, { sum: number; n: number }> = {
+          1: { sum: 0, n: 0 }, 2: { sum: 0, n: 0 }, 3: { sum: 0, n: 0 },
+        };
+        for (const a of r.answers) {
+          const idx = a.question.order - 1;
+          if (idx >= 0 && idx < TOTAL_ITEMS) items[idx] = a.numericValue;
+          const f = a.question.factor;
+          if (f && fAgg[f]) { fAgg[f]!.sum += a.numericValue; fAgg[f]!.n += 1; }
+        }
+        const present = items.filter((v): v is number => v !== null);
+        const answered = present.length;
+        const sum = present.reduce((acc, v) => acc + v, 0);
+        const total = answered ? Math.round((sum * TOTAL_ITEMS) / answered) : '';
+        const fMean = (f: number) => (fAgg[f]!.n ? Math.round((fAgg[f]!.sum / fAgg[f]!.n) * 100) / 100 : '');
+
+        return [
+          r.surveyUsername, r.group?.name ?? '', r.createdAt.toISOString(),
+          GENDER_LABELS[r.gender] ?? r.gender, AGE_LABELS[r.ageGroup] ?? r.ageGroup,
+          r.sector?.label ?? '', r.education?.label ?? '', r.designation,
+          r.country, r.state, r.city, r.consent ? 'yes' : 'no',
+          ...items.map((v) => (v ?? '')),
+          answered, total, fMean(1), fMean(2), fMean(3),
+        ].map(csv).join(',');
+      });
+
+      return [header.join(','), ...rows].join('\r\n');
+    },
   },
 
   Mutation: {

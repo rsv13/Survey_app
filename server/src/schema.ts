@@ -242,6 +242,7 @@ export const typeDefs = `#graphql
     groupAnalytics(groupId: ID): GroupAnalytics!  # GROUP_ADMIN or ADMIN; scoped by role
     participantProgress(userId: ID): ParticipantProgress!  # own, or a member you oversee
     demographicBreakdown(dimension: DemographicDimension!, groupId: ID): DemographicBreakdown!
+    exportResponsesCsv(groupId: ID): String!  # SPSS-friendly wide CSV; role-scoped
   }
 
   type Mutation {
