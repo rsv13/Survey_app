@@ -4,9 +4,12 @@
   "private": true,
   "description": "South Wales Social Well-Being Scale Survey — GraphQL research platform",
   "workspaces": [
-    "server", "web"
+    "server",
+    "web"
   ],
   "scripts": {
+    "dev": "concurrently -k -n server,web -c blue,magenta \"npm run dev -w server\" \"npm run dev -w web\"",
+    "dev:all": "npm run db:up && npm run dev",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:migrate": "npm run db:migrate -w server",
@@ -20,5 +23,8 @@
     "prisma@7.10.0": true,
     "fsevents@2.3.3": true,
     "@apollo/protobufjs@1.2.8": true
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
   }
 }
