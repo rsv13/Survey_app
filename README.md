@@ -83,6 +83,29 @@ Survey_app/
 - [ ] **Phase 7** — Survey wizard, dashboards, export UI
 - [ ] **Phase 8** — Hardening & deploy
 
+## Dashboard metrics (planned)
+
+The analytics dashboards (Phase 5) will present the SWSWBS data role-scoped,
+filterable (including a custom date range), and customizable per user. Each
+metric answers a specific question:
+
+| Metric | What it shows | What to look for |
+|---|---|---|
+| Mean total score (14–70) | Group average well-being, with 95% CI and SD | Overall level; a wide CI or SD means more uncertainty / spread |
+| Total-score distribution | How responses spread across 14–70 | Skew — a long low tail flags people struggling |
+| Subscale profile (1–5) | Average score per validated factor | The weakest factor, i.e. what to support |
+| Average per question (1–5) | Mean for each of the 14 items | The lowest items — the group's collective pain points |
+| Trend over time | Group mean per fortnight | The direction of change |
+| Mean by demographic | Average by sector / age / etc. | Segments sitting below the group mean |
+| Question × group heatmap | Mean item score by segment | Patterns and hot spots |
+| Respondent table | Per-person latest score + trajectory (pseudonymised) | Downward trends needing follow-up |
+
+Access is **role-scoped** (participant → their own results; group admin → their
+group; site admin → all groups). Segments with fewer than 5 respondents are
+**suppressed** to protect anonymity, and any "attention" flags are prompts for a
+person to review — never automated or clinical assessments. See
+`docs/LEARNING_NOTES.md` for a fuller "what each metric means and how it's read".
+
 ## Getting started
 
 You need **Node.js 22 LTS** and **Docker Desktop** installed and running.

@@ -246,6 +246,59 @@ group as a member does **not** remove your admin role. They are independent.
 
 ---
 
+## Dashboard metrics — what they mean and how they're read (design)
+
+The analytics dashboards (Phase 5) turn the stored responses into views for
+supervisors, counsellors and researchers. This section records what each metric
+means and how to read it, so the numbers are never mistaken for something they
+are not. (These same explanations appear as ⓘ tooltips on the dashboard itself.)
+
+**Headline numbers (KPI tiles)**
+
+- **Mean total score (14–70)** — the group's average SWSWBS total; higher means
+  better social well-being. The **95% confidence interval** is the range the true
+  group average likely sits in; the **standard deviation** shows how spread out
+  individuals are. A wide CI or SD means treat the average cautiously.
+- **Responses vs participants** — some people retake each fortnight, so total
+  submissions can exceed the number of distinct participants.
+- **Completed this fortnight** — how many of the cohort submitted inside the
+  current 14-day cooldown window; a simple engagement measure.
+- **Factor means (1–5)** — the average *per item* for each of the three validated
+  factors, which makes them directly comparable to each other.
+
+**Charts**
+
+- **Total-score distribution** — a histogram of how responses spread across
+  14–70. Read the shape: a cluster toward the high end is healthy; a long tail at
+  the low end flags people who may be struggling.
+- **Subscale profile** — the three factors as 1–5 bars. The lowest bar is the
+  dimension of social well-being most in need of support.
+- **Average score per question** — the mean (1–5) for each of the 14 items,
+  sorted lowest first. The lowest items are the group's collective pain points —
+  the concrete experiences to act on.
+- **Trend over time** — the group's mean per fortnight; read the direction, not
+  the absolute value.
+- **Mean by demographic** — average total by sector, age group, and so on, to see
+  which segments sit below the group mean.
+- **Question × group heatmap** — mean item score across a demographic; colour
+  patterns reveal which items dip for which group.
+- **Respondent table** — each participant's latest score, their trajectory over
+  repeated submissions, subscale means, and a follow-up status — all
+  pseudonymised.
+
+**Cross-cutting rules (the same everywhere)**
+
+- **Role-scoped**: participants see only their own results, group admins only
+  their group(s), the site admin everything — enforced server-side (Phase 3).
+- **Small-N suppression**: a segment average is hidden when it covers fewer than
+  ~5 respondents, so no individual can be re-identified from an aggregate.
+- **Non-clinical framing**: the scale measures *social well-being*, not clinical
+  risk. "Attention" flags are prompts for a human to review, never an automated
+  judgement.
+- **Filterable and customizable**: a global filter bar (group, date range —
+  presets or a custom range — sector, age, gender) drives every widget at once,
+  and users can save named views.
+
 ## What's next
 
 - **Analytics + export**: aggregation queries for dashboards (group and admin-wide
