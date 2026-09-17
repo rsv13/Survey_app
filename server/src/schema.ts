@@ -214,6 +214,24 @@ export const typeDefs = `#graphql
     points: [ProgressPoint!]!   # oldest first
   }
 
+    # Which demographic field to break the group down by.
+  enum DemographicDimension { SECTOR AGE_GROUP GENDER EDUCATION }
+
+  # One value of that dimension (e.g. one sector), with its stats.
+  type DemographicSegment {
+    label: String!
+    n: Int!
+    suppressed: Boolean!   # true when n < 5: the mean is hidden to protect anonymity
+    mean: Float            # null when suppressed
+    ci95Lower: Float       # null when suppressed
+    ci95Upper: Float       # null when suppressed
+  }
+
+  type DemographicBreakdown {
+    dimension: DemographicDimension!
+    segments: [DemographicSegment!]!
+  }
+
   # ---------- Root types ----------
 
   type Query {
@@ -223,6 +241,7 @@ export const typeDefs = `#graphql
     surveyEligibility: SurveyEligibility!
     groupAnalytics(groupId: ID): GroupAnalytics!  # GROUP_ADMIN or ADMIN; scoped by role
     participantProgress(userId: ID): ParticipantProgress!  # own, or a member you oversee
+    demographicBreakdown(dimension: DemographicDimension!, groupId: ID): DemographicBreakdown!
   }
 
   type Mutation {

@@ -380,6 +380,101 @@ export const resolvers = {
 
       return { surveyUsername: target.surveyUsername, count: points.length, points };
     },
+        // Mean total by a demographic dimension, with small-N suppression.
+    // GROUP_ADMIN (their groups) or ADMIN — same scoping as groupAnalytics.
+    demographicBreakdown: async (
+      _parent: unknown,
+      args: { dimension: 'SECTOR' | 'AGE_GROUP' | 'GENDER' | 'EDUCATION'; groupId?: string | null },
+      context: Context,
+    ) => {
+      const user = await requireUser(context);
+      if (user.role !== 'ADMIN' && user.role !== 'GROUP_ADMIN') {
+        throw new GraphQLError('Only a group admin or site admin can view analytics.', {
+          extensions: { code: 'FORBIDDEN' },
+        });
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const where: any = { deletedAt: null };
+      if (user.role === 'GROUP_ADMIN') {
+        const adminGroups = await prisma.group.findMany({
+          where: { admins: { some: { id: user.id } }, deletedAt: null },
+          select: { id: true },
+        });
+        const ids = adminGroups.map((g) => g.id);
+        if (args.groupId) {
+          if (!ids.includes(args.groupId)) {
+            throw new GraphQLError('You do not administer that group.', {
+              extensions: { code: 'FORBIDDEN' },
+            });
+          }
+          where.groupId = args.groupId;
+        } else {
+          where.groupId = { in: ids.length ? ids : ['__none__'] };
+        }
+      } else if (args.groupId) {
+        where.groupId = args.groupId;
+      }
+
+      const responses = await prisma.surveyResponse.findMany({
+        where,
+        select: {
+          gender: true,
+          ageGroup: true,
+          sector: { select: { label: true } },
+          education: { select: { label: true } },
+          answers: { select: { numericValue: true } },
+        },
+      });
+
+      // Friendly labels for the enum dimensions (sector/education already have labels).
+      const GENDER_LABELS: Record<string, string> = {
+        MALE: 'Male', FEMALE: 'Female', PREFER_NOT_TO_SAY: 'Prefer not to say', OTHERS: 'Other',
+      };
+      const AGE_LABELS: Record<string, string> = {
+        AGE_16_24: '16–24', AGE_25_34: '25–34', AGE_35_44: '35–44',
+        AGE_45_54: '45–54', AGE_55_64: '55–64', AGE_65_PLUS: '65+',
+      };
+
+      // Bucket each response's total under the chosen dimension's value.
+      const groups = new Map<string, number[]>();
+      for (const r of responses) {
+        const vals = r.answers.map((a) => a.numericValue);
+        const n = vals.length;
+        if (n === 0) continue;
+        const total = Math.round((vals.reduce((s, v) => s + v, 0) * TOTAL_ITEMS) / n);
+        let k: string;
+        switch (args.dimension) {
+          case 'SECTOR': k = r.sector?.label ?? 'Unknown'; break;
+          case 'EDUCATION': k = r.education?.label ?? 'Unknown'; break;
+          case 'GENDER': k = GENDER_LABELS[r.gender] ?? r.gender; break;
+          case 'AGE_GROUP': k = AGE_LABELS[r.ageGroup] ?? r.ageGroup; break;
+          default: k = 'Unknown';
+        }
+        let arr = groups.get(k);
+        if (!arr) { arr = []; groups.set(k, arr); }
+        arr.push(total);
+      }
+
+      const SUPPRESS_BELOW = 5; // hide a segment's mean if fewer than 5 people
+      const segments = [...groups.entries()].map(([label, totals]) => {
+        const n = totals.length;
+        if (n < SUPPRESS_BELOW) {
+          return { label, n, suppressed: true, mean: null, ci95Lower: null, ci95Upper: null };
+        }
+        const s = computeStats(totals);
+        return { label, n, suppressed: false, mean: s.mean, ci95Lower: s.ci95Lower, ci95Upper: s.ci95Upper };
+      });
+
+      // Visible segments by mean (high to low); suppressed ones after, by size.
+      segments.sort((a, b) => {
+        if (a.suppressed !== b.suppressed) return a.suppressed ? 1 : -1;
+        if (!a.suppressed && !b.suppressed) return b.mean! - a.mean!;
+        return b.n - a.n;
+      });
+
+      return { dimension: args.dimension, segments };
+    },
   },
 
   Mutation: {
