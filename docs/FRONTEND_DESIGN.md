@@ -49,6 +49,10 @@ alone. `--calm-deep` is the link/heading accent, chosen for contrast on each sur
 - Using real USW branding in production requires USW's permission (see the
   pre-launch checklist). Until then, the original mark is a placeholder.
 
+## Tagline
+
+**“Well-being today for a stronger tomorrow.”** (chosen 2026-09-17.) Used under the SWSWBS wordmark in the logo lockup and where a strapline is helpful; the wordmark reads “SWSWBS — South Wales Social Well-being Scale”.
+
 ## Themes
 
 - Support **light and dark mode**, defaulting to the visitor's system preference,
