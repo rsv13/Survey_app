@@ -78,7 +78,7 @@ Survey_app/
 - [x] **Phase 2** — Auth: signup, email verification, login (JWT), roles
 - [x] **Phase 3** — Survey responses: scoring, imputation, subscales, 14-day cooldown
 - [x] **Phase 4** — Groups & authorization: full group lifecycle, role-scoped access
-- [ ] **Phase 5** — Analytics + export (dashboards aggregations, SPSS-friendly CSV/Excel)
+- [x] **Phase 5** — Analytics + export: role-scoped aggregations (group / participant / demographic) and SPSS-friendly CSV export
 - [ ] **Phase 6** — Frontend foundation (React + Vite + Apollo Client + shadcn/ui)
 - [ ] **Phase 7** — Survey wizard, dashboards, export UI
 - [ ] **Phase 8** — Hardening & deploy

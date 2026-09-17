@@ -299,11 +299,34 @@ are not. (These same explanations appear as ⓘ tooltips on the dashboard itself
   presets or a custom range — sector, age, gender) drives every widget at once,
   and users can save named views.
 
+## Phase 5 — Analytics & export
+
+With the data collected, this phase turns it into the numbers the dashboards and
+researchers need. Four role-scoped queries were added, all sharing the patterns
+from earlier phases.
+
+- **`groupAnalytics`** — the group/admin summary: response and participant counts,
+  the total-score mean, standard deviation and 95% confidence interval, a score
+  distribution (8 bins across 14–70), the three subscale means, and per-item means.
+- **`participantProgress`** — one participant's total and subscale scores over their
+  repeated submissions (their own view, or a member a group admin / site admin
+  reviews), so an individual's change over time is visible.
+- **`demographicBreakdown`** — mean total by sector, age group, gender, or
+  education, with segments under five respondents suppressed to protect anonymity.
+- **`exportResponsesCsv`** — an SPSS-friendly wide CSV (one row per response:
+  pseudonym, demographics, the 14 item values, total, and subscale means), returned
+  as text for the client to download.
+
+Three things hold across all four: **role scoping** is reused from `surveyResponses`
+(a group admin only ever aggregates their own groups); the **total score is computed
+with the identical rule** as the individual field resolver, so a number can never
+disagree between two screens; and the **statistics are exactly what the SWSWBS User
+Guide recommends reporting** (a mean with SD or 95% CI). The aggregation runs in
+application code for now — clear and correct; moving it into SQL is a scale
+optimisation noted for later.
+
 ## What's next
 
-- **Analytics + export**: aggregation queries for dashboards (group and admin-wide
-  means, standard deviation, 95% confidence intervals on the 14–70 scale, subscale
-  breakdowns) and an SPSS-friendly CSV/Excel export.
 - **Frontend**: React + Vite + Apollo Client + shadcn/ui — auth screens, the survey
   wizard with the cooldown timer, dashboards with charts, and the export button.
 - **Hardening before deploy**: httpOnly refresh cookies, input validation, rate
