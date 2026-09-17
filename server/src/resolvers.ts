@@ -10,6 +10,7 @@ import {
   createVerificationToken,
   hashToken,
 } from './lib/auth.js';
+import { normaliseEmail, validatePassword } from './lib/validation.js';
 import crypto from 'node:crypto';
 
 // Argument shapes (match the schema inputs).
@@ -164,7 +165,9 @@ export const resolvers = {
 
   Mutation: {
     signUp: async (_parent: unknown, args: SignUpArgs) => {
-      const { username, email, password } = args.input;
+      const { username, password } = args.input;
+      const email = normaliseEmail(args.input.email); // trims + lower-cases + checks format
+      validatePassword(password);
       const existing = await prisma.user.findFirst({ where: { OR: [{ email }, { username }] } });
       if (existing) {
         throw new GraphQLError('That email or username is already in use.', {
@@ -207,7 +210,8 @@ export const resolvers = {
     },
 
     signIn: async (_parent: unknown, args: SignInArgs) => {
-      const { email, password } = args.input;
+      const { password } = args.input;
+      const email = args.input.email.trim().toLowerCase();
       const user = await prisma.user.findUnique({ where: { email } });
       if (!user || !user.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
         throw new GraphQLError('Invalid email or password.', {
