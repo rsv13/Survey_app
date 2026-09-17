@@ -198,6 +198,22 @@ export const typeDefs = `#graphql
     items: [ItemMean!]!
   }
 
+    # One submission in a participant's history.
+  type ProgressPoint {
+    date: String!         # when it was submitted (ISO timestamp)
+    totalScore: Int!
+    answered: Int!        # how many of the 14 items were answered
+    subscales: [FactorMean!]!   # per-item mean (1–5) per factor, reused type
+  }
+
+  # A single participant's scores over time — their own, or a member a
+  # group admin / site admin is reviewing. Always pseudonymised.
+  type ParticipantProgress {
+    surveyUsername: String!
+    count: Int!
+    points: [ProgressPoint!]!   # oldest first
+  }
+
   # ---------- Root types ----------
 
   type Query {
@@ -206,6 +222,7 @@ export const typeDefs = `#graphql
     surveyResponses: [SurveyResponse!]! # role-scoped: admin=all, group admin=their group, user=their own
     surveyEligibility: SurveyEligibility!
     groupAnalytics(groupId: ID): GroupAnalytics!  # GROUP_ADMIN or ADMIN; scoped by role
+    participantProgress(userId: ID): ParticipantProgress!  # own, or a member you oversee
   }
 
   type Mutation {

@@ -303,6 +303,83 @@ export const resolvers = {
         items,
       };
     },
+
+        // A participant's scores over time — their own, or a member overseen by a
+    // group admin / site admin. Reuses the survey scoring rule for each point.
+    participantProgress: async (
+      _parent: unknown,
+      args: { userId?: string | null },
+      context: Context,
+    ) => {
+      const caller = await requireUser(context);
+
+      let target = caller;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const where: any = { deletedAt: null };
+
+      if (args.userId && args.userId !== caller.id) {
+        // Viewing someone else — admins and group admins only.
+        if (caller.role !== 'ADMIN' && caller.role !== 'GROUP_ADMIN') {
+          throw new GraphQLError('You can only view your own progress.', {
+            extensions: { code: 'FORBIDDEN' },
+          });
+        }
+        const found = await prisma.user.findUnique({ where: { id: args.userId } });
+        if (!found) {
+          throw new GraphQLError('No user found with that id.', {
+            extensions: { code: 'BAD_USER_INPUT' },
+          });
+        }
+        if (caller.role === 'GROUP_ADMIN') {
+          // Only a member of a group you administer, and only their responses
+          // made under your groups.
+          const adminGroups = await prisma.group.findMany({
+            where: { admins: { some: { id: caller.id } }, deletedAt: null },
+            select: { id: true },
+          });
+          const ids = adminGroups.map((g) => g.id);
+          if (!found.groupId || !ids.includes(found.groupId)) {
+            throw new GraphQLError('That participant is not in a group you administer.', {
+              extensions: { code: 'FORBIDDEN' },
+            });
+          }
+          where.groupId = { in: ids };
+        }
+        target = found;
+      }
+
+      where.userId = target.id;
+
+      const responses = await prisma.surveyResponse.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+        select: {
+          createdAt: true,
+          answers: { select: { numericValue: true, question: { select: { factor: true } } } },
+        },
+      });
+
+      const points = responses.map((r) => {
+        const vals = r.answers.map((a) => a.numericValue);
+        const n = vals.length;
+        const total = n ? Math.round((vals.reduce((s, v) => s + v, 0) * TOTAL_ITEMS) / n) : 0;
+        const agg: Record<number, { sum: number; n: number }> = {
+          1: { sum: 0, n: 0 }, 2: { sum: 0, n: 0 }, 3: { sum: 0, n: 0 },
+        };
+        for (const a of r.answers) {
+          const f = a.question.factor;
+          if (f && agg[f]) { agg[f]!.sum += a.numericValue; agg[f]!.n += 1; }
+        }
+        const subscales = [1, 2, 3].map((f) => ({
+          factor: f,
+          name: FACTOR_NAMES[f]!,
+          mean: agg[f]!.n ? Math.round((agg[f]!.sum / agg[f]!.n) * 100) / 100 : 0,
+        }));
+        return { date: r.createdAt.toISOString(), totalScore: total, answered: n, subscales };
+      });
+
+      return { surveyUsername: target.surveyUsername, count: points.length, points };
+    },
   },
 
   Mutation: {
