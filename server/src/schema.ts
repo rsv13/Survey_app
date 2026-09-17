@@ -152,6 +152,52 @@ export const typeDefs = `#graphql
     answers: [SurveyAnswerInput!]!
   }
 
+    # ---------- Analytics (Phase 5) ----------
+
+  # Summary statistics for a set of total scores (14–70).
+  type ScoreStat {
+    mean: Float!
+    sd: Float!            # sample standard deviation (spread of individuals)
+    ci95Lower: Float!     # 95% confidence interval for the mean (approximate)
+    ci95Upper: Float!
+    min: Int!
+    max: Int!
+  }
+
+  # One bar of the total-score histogram.
+  type DistributionBin {
+    label: String!
+    from: Int!
+    to: Int!
+    count: Int!
+  }
+
+  # A subscale (factor) average, as a per-item mean (1–5) so factors compare.
+  type FactorMean {
+    factor: Int!
+    name: String!
+    mean: Float!
+  }
+
+  # A single question's average across the group (1–5).
+  type ItemMean {
+    order: Int!
+    text: String!
+    factor: Int
+    mean: Float!
+    n: Int!               # how many answered this item
+  }
+
+  # The aggregated view a group/admin dashboard renders.
+  type GroupAnalytics {
+    responseCount: Int!
+    participantCount: Int!
+    totalScore: ScoreStat!
+    distribution: [DistributionBin!]!
+    subscales: [FactorMean!]!
+    items: [ItemMean!]!
+  }
+
   # ---------- Root types ----------
 
   type Query {
@@ -159,6 +205,7 @@ export const typeDefs = `#graphql
     me: User
     surveyResponses: [SurveyResponse!]! # role-scoped: admin=all, group admin=their group, user=their own
     surveyEligibility: SurveyEligibility!
+    groupAnalytics(groupId: ID): GroupAnalytics!  # GROUP_ADMIN or ADMIN; scoped by role
   }
 
   type Mutation {

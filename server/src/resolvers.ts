@@ -113,6 +113,42 @@ const responseInclude = {
   education: true,
 } as const;
 
+// Mean, sample SD, and an approximate 95% CI for a list of total scores.
+function computeStats(values: number[]) {
+  const n = values.length;
+  if (n === 0) return { mean: 0, sd: 0, ci95Lower: 0, ci95Upper: 0, min: 0, max: 0 };
+  const round2 = (x: number) => Math.round(x * 100) / 100;
+  const mean = values.reduce((s, v) => s + v, 0) / n;
+  // Sample variance divides by n-1 (needs at least 2 values to have spread).
+  const variance = n > 1 ? values.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1) : 0;
+  const sd = Math.sqrt(variance);
+  const margin = 1.96 * (sd / Math.sqrt(n)); // 1.96 = the 95% multiplier
+  return {
+    mean: round2(mean),
+    sd: round2(sd),
+    ci95Lower: round2(mean - margin),
+    ci95Upper: round2(mean + margin),
+    min: Math.min(...values),
+    max: Math.max(...values),
+  };
+}
+
+// Bucket total scores into 8 bins across the 14–70 range for the histogram.
+function buildDistribution(values: number[]) {
+  const START = 14, BIN = 7, BINS = 8; // 14–20, 21–27, … , 63–70
+  const bins = Array.from({ length: BINS }, (_, i) => {
+    const from = START + i * BIN;
+    const to = i === BINS - 1 ? 70 : from + BIN - 1;
+    return { label: `${from}\u2013${to}`, from, to, count: 0 };
+  });
+  for (const v of values) {
+    let idx = Math.floor((v - START) / BIN);
+    idx = Math.max(0, Math.min(BINS - 1, idx)); // clamp into range
+    bins[idx]!.count++;
+  }
+  return bins;
+}
+
 export const resolvers = {
   Query: {
     surveyDefinition: async () => {
@@ -159,6 +195,112 @@ export const resolvers = {
         canSubmit,
         nextEligibleAt: canSubmit ? null : nextEligible!.toISOString(),
         cooldownDays: COOLDOWN_DAYS,
+      };
+    },
+        // Aggregated stats for the group/admin dashboard. GROUP_ADMIN or ADMIN only.
+    groupAnalytics: async (
+      _parent: unknown,
+      args: { groupId?: string | null },
+      context: Context,
+    ) => {
+      const user = await requireUser(context);
+      if (user.role !== 'ADMIN' && user.role !== 'GROUP_ADMIN') {
+        throw new GraphQLError('Only a group admin or site admin can view analytics.', {
+          extensions: { code: 'FORBIDDEN' },
+        });
+      }
+
+      // Build a role-scoped filter, honouring an optional groupId.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const where: any = { deletedAt: null };
+      if (user.role === 'GROUP_ADMIN') {
+        // A group admin may only see groups they actually administer.
+        const adminGroups = await prisma.group.findMany({
+          where: { admins: { some: { id: user.id } }, deletedAt: null },
+          select: { id: true },
+        });
+        const ids = adminGroups.map((g) => g.id);
+        if (args.groupId) {
+          if (!ids.includes(args.groupId)) {
+            throw new GraphQLError('You do not administer that group.', {
+              extensions: { code: 'FORBIDDEN' },
+            });
+          }
+          where.groupId = args.groupId;
+        } else {
+          // "__none__" guarantees an empty result if they admin no groups yet.
+          where.groupId = { in: ids.length ? ids : ['__none__'] };
+        }
+      } else if (args.groupId) {
+        where.groupId = args.groupId; // ADMIN focusing on one group
+      }
+
+      // Fetch the scoped responses with each answer's value + question info.
+      const responses = await prisma.surveyResponse.findMany({
+        where,
+        select: {
+          userId: true,
+          answers: {
+            select: {
+              numericValue: true,
+              question: { select: { order: true, text: true, factor: true } },
+            },
+          },
+        },
+      });
+
+      // Per-response total, using the SAME imputation rule as the field resolver.
+      const totals: number[] = [];
+      const factorAgg: Record<number, { sum: number; n: number }> = {
+        1: { sum: 0, n: 0 }, 2: { sum: 0, n: 0 }, 3: { sum: 0, n: 0 },
+      };
+      const itemAgg = new Map<number, { order: number; text: string; factor: number | null; sum: number; n: number }>();
+
+      for (const r of responses) {
+        const vals = r.answers.map((a) => a.numericValue);
+        const n = vals.length;
+        if (n > 0) {
+          const sum = vals.reduce((s, v) => s + v, 0);
+          totals.push(Math.round((sum * TOTAL_ITEMS) / n));
+        }
+        for (const a of r.answers) {
+          const q = a.question;
+          if (q.factor && factorAgg[q.factor]) {
+            factorAgg[q.factor]!.sum += a.numericValue;
+            factorAgg[q.factor]!.n += 1;
+          }
+          const it = itemAgg.get(q.order) ?? { order: q.order, text: q.text, factor: q.factor, sum: 0, n: 0 };
+          it.sum += a.numericValue;
+          it.n += 1;
+          itemAgg.set(q.order, it);
+        }
+      }
+
+      const participantCount = new Set(
+        responses.map((r) => r.userId).filter((id): id is string => !!id),
+      ).size;
+
+      const subscales = [1, 2, 3].map((f) => ({
+        factor: f,
+        name: FACTOR_NAMES[f]!,
+        mean: factorAgg[f]!.n ? Math.round((factorAgg[f]!.sum / factorAgg[f]!.n) * 100) / 100 : 0,
+      }));
+
+      const items = [...itemAgg.values()]
+        .sort((a, b) => a.order - b.order)
+        .map((it) => ({
+          order: it.order, text: it.text, factor: it.factor,
+          mean: it.n ? Math.round((it.sum / it.n) * 100) / 100 : 0,
+          n: it.n,
+        }));
+
+      return {
+        responseCount: responses.length,
+        participantCount,
+        totalScore: computeStats(totals),
+        distribution: buildDistribution(totals),
+        subscales,
+        items,
       };
     },
   },
