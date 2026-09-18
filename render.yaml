@@ -17,7 +17,7 @@ services:
     # --include=dev so build tools (tsx, prisma, typescript) install even though
     # Render sets NODE_ENV=production. Then generate the client, apply migrations,
     # and seed the baseline data (idempotent).
-    buildCommand: npm install --include=dev && npm run db:generate -w server && npm run db:migrate:deploy -w server && npm run db:seed -w server
+    buildCommand: npm install --include=dev && npm run db:generate -w server && npm run db:migrate:deploy -w server && npm run db:seed -w server && npm run db:sample -w server
     startCommand: npm run start -w server
     envVars:
       - key: NODE_ENV
