@@ -497,36 +497,62 @@ export const resolvers = {
     // text; the client turns it into a download. GROUP_ADMIN (their groups) or ADMIN.
     exportResponsesCsv: async (
       _parent: unknown,
-      args: { groupId?: string | null },
+      args: { groupId?: string | null; userId?: string | null },
       context: Context,
     ) => {
       const user = await requireUser(context);
-      if (user.role !== 'ADMIN' && user.role !== 'GROUP_ADMIN') {
-        throw new GraphQLError('Only a group admin or site admin can export data.', {
-          extensions: { code: 'FORBIDDEN' },
-        });
-      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const where: any = { deletedAt: null };
-      if (user.role === 'GROUP_ADMIN') {
-        const adminGroups = await prisma.group.findMany({
-          where: { admins: { some: { id: user.id } }, deletedAt: null },
-          select: { id: true },
-        });
-        const ids = adminGroups.map((g) => g.id);
-        if (args.groupId) {
-          if (!ids.includes(args.groupId)) {
-            throw new GraphQLError('You do not administer that group.', {
+
+      if (args.userId && args.userId === user.id) {
+        // Exporting your OWN data — always allowed, whatever your role.
+        where.userId = user.id;
+      } else if (user.role === 'NORMAL_USER') {
+        // Participants may only ever export their own responses.
+        where.userId = user.id;
+      } else if (args.userId) {
+        // A group admin / site admin exporting one specific participant.
+        if (user.role === 'GROUP_ADMIN') {
+          const adminGroups = await prisma.group.findMany({
+            where: { admins: { some: { id: user.id } }, deletedAt: null },
+            select: { id: true },
+          });
+          const ids = adminGroups.map((g) => g.id);
+          const target = await prisma.user.findUnique({ where: { id: args.userId }, select: { groupId: true } });
+          if (!target || !target.groupId || !ids.includes(target.groupId)) {
+            throw new GraphQLError('That participant is not in a group you administer.', {
               extensions: { code: 'FORBIDDEN' },
             });
           }
-          where.groupId = args.groupId;
-        } else {
-          where.groupId = { in: ids.length ? ids : ['__none__'] };
         }
-      } else if (args.groupId) {
-        where.groupId = args.groupId;
+        where.userId = args.userId;
+      } else {
+        // Whole-group export — group admin (their groups) or site admin.
+        if (user.role !== 'ADMIN' && user.role !== 'GROUP_ADMIN') {
+          throw new GraphQLError('Only a group admin or site admin can export group data.', {
+            extensions: { code: 'FORBIDDEN' },
+          });
+        }
+        if (user.role === 'GROUP_ADMIN') {
+          const adminGroups = await prisma.group.findMany({
+            where: { admins: { some: { id: user.id } }, deletedAt: null },
+            select: { id: true },
+          });
+          const ids = adminGroups.map((g) => g.id);
+          if (args.groupId) {
+            if (!ids.includes(args.groupId)) {
+              throw new GraphQLError('You do not administer that group.', {
+                extensions: { code: 'FORBIDDEN' },
+              });
+            }
+            where.groupId = args.groupId;
+          } else {
+            where.groupId = { in: ids.length ? ids : ['__none__'] };
+          }
+        } else if (args.groupId) {
+          where.groupId = args.groupId;
+        }
       }
 
       const responses = await prisma.surveyResponse.findMany({

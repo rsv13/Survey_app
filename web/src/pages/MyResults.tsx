@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@apollo/client/react'
+import { useAuth } from '../auth-context'
+import { downloadResponsesCsv } from '../exportCsv'
 import { MY_RESPONSES } from '../graphql-survey'
 import { ScoreChart } from '../components/ScoreChart'
 
@@ -17,6 +19,7 @@ const fmtLong = (v: string) =>
   parseDate(v).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
 
 export default function MyResults() {
+  const { user } = useAuth()
   const { data, loading, error } = useQuery<Data>(MY_RESPONSES, { fetchPolicy: 'cache-and-network' })
 
   // Sort oldest→newest for the chart; the latest is the last entry.
@@ -54,10 +57,19 @@ export default function MyResults() {
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-16">
-      <h1 className="text-3xl font-semibold text-ink">Your results</h1>
-      <p className="mt-2 text-ink-2">
-        The scale runs from 14 to 70 — a higher score reflects greater social well-being.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold text-ink">Your results</h1>
+          <p className="mt-2 text-ink-2">
+            The scale runs from 14 to 70 — a higher score reflects greater social well-being.
+          </p>
+        </div>
+        <button
+          onClick={() => downloadResponsesCsv({ userId: user?.id, filename: 'swswbs-my-responses.csv' })}
+          className="rounded-xl border border-border px-4 py-2 text-sm font-semibold text-ink hover:border-calm">
+          Download my data
+        </button>
+      </div>
 
       {/* Latest score + subscales */}
       <div className="mt-8 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-center">

@@ -28,7 +28,7 @@ export const DEMOGRAPHIC_BREAKDOWN = gql`
 
 // The wide, SPSS-friendly CSV export as a string (we turn it into a download).
 export const EXPORT_CSV = gql`
-  query ExportCsv($groupId: ID) {
-    exportResponsesCsv(groupId: $groupId)
+  query ExportCsv($groupId: ID, $userId: ID) {
+    exportResponsesCsv(groupId: $groupId, userId: $userId)
   }
 `

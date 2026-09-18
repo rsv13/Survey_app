@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { useAuth } from '../auth-context'
+import { downloadResponsesCsv } from '../exportCsv'
 import {
   MY_GROUPS, MEMBERSHIP, CREATE_GROUP, JOIN_GROUP, LEAVE_GROUP,
   REMOVE_MEMBER, ADD_GROUP_ADMIN, GRANT_GROUP_ADMIN,
@@ -208,9 +209,16 @@ function GroupCard({ group, onChange }: { group: Group; onChange: () => void }) 
             {participants.map((m) => (
               <li key={m.id} className="flex items-center justify-between px-4 py-2">
                 <span className="font-mono text-sm text-ink">{m.surveyUsername}</span>
-                <button onClick={() => onRemove(m.id)} className="text-sm font-semibold text-brand-strong hover:underline">
-                  Remove
-                </button>
+                <span className="flex items-center gap-4">
+                  <button
+                    onClick={() => downloadResponsesCsv({ userId: m.id, filename: `swswbs-${m.surveyUsername}.csv` })}
+                    className="text-sm font-semibold text-calm-deep hover:underline">
+                    Download
+                  </button>
+                  <button onClick={() => onRemove(m.id)} className="text-sm font-semibold text-brand-strong hover:underline">
+                    Remove
+                  </button>
+                </span>
               </li>
             ))}
           </ul>

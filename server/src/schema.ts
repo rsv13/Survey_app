@@ -252,7 +252,7 @@ export const typeDefs = `#graphql
     groupAnalytics(groupId: ID): GroupAnalytics!  # GROUP_ADMIN or ADMIN; scoped by role
     participantProgress(userId: ID): ParticipantProgress!  # own, or a member you oversee
     demographicBreakdown(dimension: DemographicDimension!, groupId: ID): DemographicBreakdown!
-    exportResponsesCsv(groupId: ID): String!  # SPSS-friendly wide CSV; role-scoped
+    exportResponsesCsv(groupId: ID, userId: ID): String!  # CSV: whole-group, one participant, or your own data
     myGroups: [Group!]!  # groups the caller administers (ADMIN sees all)
   }
 

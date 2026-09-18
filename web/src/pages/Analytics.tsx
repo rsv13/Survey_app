@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useQuery } from '@apollo/client/react'
 import { useAuth } from '../auth-context'
-import { apolloClient } from '../apollo'
 import { MY_GROUPS } from '../graphql-groups'
-import { GROUP_ANALYTICS, DEMOGRAPHIC_BREAKDOWN, EXPORT_CSV } from '../graphql-analytics'
+import { GROUP_ANALYTICS, DEMOGRAPHIC_BREAKDOWN } from '../graphql-analytics'
+import { downloadResponsesCsv } from '../exportCsv'
 
 // ---- Types ----
 type Stat = { mean: number; sd: number; ci95Lower: number; ci95Upper: number; min: number; max: number }
@@ -44,17 +44,7 @@ export default function Analytics() {
   async function downloadCsv() {
     setExporting(true)
     try {
-      const { data } = await apolloClient.query<{ exportResponsesCsv: string }>({
-        query: EXPORT_CSV, variables: { groupId: groupId || null }, fetchPolicy: 'network-only',
-      })
-      const csv = data?.exportResponsesCsv ?? ''
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `swswbs-responses-${groupId || 'all'}.csv`
-      a.click()
-      URL.revokeObjectURL(url)
+      await downloadResponsesCsv({ groupId: groupId || null, filename: `swswbs-responses-${groupId || 'all'}.csv` })
     } finally {
       setExporting(false)
     }
