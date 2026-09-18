@@ -63,6 +63,14 @@ export const typeDefs = `#graphql
 
   # A group gathers participants under one or more Group Admins so their responses can be analysed together.
 
+  # A participant in a group, shown to its admins by pseudonym only — never
+  # their real name or email — to protect confidentiality.
+  type GroupMember {
+    id: ID!
+    surveyUsername: String!
+    role: Role!
+  }
+
   type Group {
     id: ID!
     name: String!
@@ -70,6 +78,7 @@ export const typeDefs = `#graphql
     inviteCode: String!     # the code a member enters to join
     creator: User!          # who created the group
     memberCount: Int!       # computed on demand, like totalScore
+    members: [GroupMember!]!  # the group's participants (pseudonymised)
     createdAt: String!
   }
 
@@ -243,6 +252,7 @@ export const typeDefs = `#graphql
     participantProgress(userId: ID): ParticipantProgress!  # own, or a member you oversee
     demographicBreakdown(dimension: DemographicDimension!, groupId: ID): DemographicBreakdown!
     exportResponsesCsv(groupId: ID): String!  # SPSS-friendly wide CSV; role-scoped
+    myGroups: [Group!]!  # groups the caller administers (ADMIN sees all)
   }
 
   type Mutation {

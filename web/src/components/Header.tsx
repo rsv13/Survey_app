@@ -51,6 +51,14 @@ export function Header() {
               My results
             </NavLink>
           )}
+          {user && (
+            <NavLink to="/groups"
+              className={({ isActive }) =>
+                `text-sm font-semibold ${isActive ? 'text-calm-deep' : 'text-ink-2 hover:text-calm-deep'}`
+              }>
+              Groups
+            </NavLink>
+          )}
         </nav>
 
         <div className="ml-auto flex items-center gap-2 md:ml-6">

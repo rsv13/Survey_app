@@ -173,6 +173,22 @@ export const resolvers = {
       return prisma.user.findUnique({ where: { id: context.userId } });
     },
 
+    // Groups the caller administers. Site admins see every group; group
+    // admins see only the ones they're an admin of; everyone else sees none.
+    myGroups: async (_parent: unknown, _args: unknown, context: Context) => {
+      const user = await requireUser(context);
+      if (user.role === 'ADMIN') {
+        return prisma.group.findMany({ where: { deletedAt: null }, orderBy: { createdAt: 'desc' } });
+      }
+      if (user.role === 'GROUP_ADMIN') {
+        return prisma.group.findMany({
+          where: { admins: { some: { id: user.id } }, deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+        });
+      }
+      return [];
+    },
+
     // Responses scoped by the current user's role.
     surveyResponses: async (_parent: unknown, _args: unknown, context: Context) => {
       const user = await requireUser(context);
@@ -1026,6 +1042,28 @@ export const resolvers = {
     // Count members on demand (users whose groupId points at this group).
     memberCount: (parent: { id: string }) =>
       prisma.user.count({ where: { groupId: parent.id, deletedAt: null } }),
+
+    // The group's participants, pseudonymised. Only the group's own admins
+    // (or a site admin) may read this list.
+    members: async (parent: { id: string }, _args: unknown, context: Context) => {
+      const caller = await requireUser(context);
+      if (caller.role !== 'ADMIN') {
+        const g = await prisma.group.findUnique({
+          where: { id: parent.id },
+          include: { admins: { select: { id: true } } },
+        });
+        const administers = g?.admins.some((a) => a.id === caller.id);
+        if (!administers) {
+          throw new GraphQLError('Only a group admin can view its members.', {
+            extensions: { code: 'FORBIDDEN' },
+          });
+        }
+      }
+      return prisma.user.findMany({
+        where: { groupId: parent.id, deletedAt: null },
+        orderBy: { surveyUsername: 'asc' },
+      });
+    },
 
     // Fetch the creator row from the stored creatorId.
     creator: (parent: { creatorId: string }) =>
