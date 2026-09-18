@@ -9,6 +9,7 @@ import SignUp from './pages/SignUp'
 import VerifyEmail from './pages/VerifyEmail'
 import MyResults from './pages/MyResults'
 import Groups from './pages/Groups'
+import Analytics from './pages/Analytics'
 import { RequireAuth } from './components/RequireAuth'
 
 export const router = createBrowserRouter([
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
       { path: 'survey', element: <RequireAuth><Survey /></RequireAuth> },
       { path: 'results', element: <RequireAuth><MyResults /></RequireAuth> },
       { path: 'groups', element: <RequireAuth><Groups /></RequireAuth> },
+      { path: 'analytics', element: <RequireAuth><Analytics /></RequireAuth> },
       { path: 'about', element: <About /> },
       { path: 'resources', element: <Resources /> },
       { path: 'sign-in', element: <SignIn /> },

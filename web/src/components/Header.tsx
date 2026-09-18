@@ -59,6 +59,14 @@ export function Header() {
               Groups
             </NavLink>
           )}
+          {(user?.role === 'GROUP_ADMIN' || user?.role === 'ADMIN') && (
+            <NavLink to="/analytics"
+              className={({ isActive }) =>
+                `text-sm font-semibold ${isActive ? 'text-calm-deep' : 'text-ink-2 hover:text-calm-deep'}`
+              }>
+              Analytics
+            </NavLink>
+          )}
         </nav>
 
         <div className="ml-auto flex items-center gap-2 md:ml-6">
