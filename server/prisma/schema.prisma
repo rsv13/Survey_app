@@ -90,6 +90,7 @@ model User {
   refreshTokens      RefreshToken[]
   verificationTokens VerificationToken[]
   notes              Note[]             // personal reminders/notes
+  deletionRequests   DataDeletionRequest[] // GDPR erasure requests
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -232,5 +233,24 @@ model Note {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([userId])
+}
+
+enum DeletionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model DataDeletionRequest {
+  id         String         @id @default(cuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason     String?
+  status     DeletionStatus @default(PENDING)
+  createdAt  DateTime       @default(now())
+  reviewedAt DateTime?
+
+  @@index([status])
   @@index([userId])
 }

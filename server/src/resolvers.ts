@@ -11,7 +11,7 @@ import {
   hashToken,
 } from './lib/auth.js';
 import { normaliseEmail, validatePassword } from './lib/validation.js';
-import { sendVerificationEmail, sendPasswordResetEmail } from './lib/email.js';
+import { sendVerificationEmail, sendPasswordResetEmail, sendDataDeletionEmail } from './lib/email.js';
 import crypto from 'node:crypto';
 
 // Argument shapes (match the schema inputs).
@@ -193,6 +193,18 @@ export const resolvers = {
     myNotes: async (_parent: unknown, _args: unknown, context: Context) => {
       const user = await requireUser(context);
       return prisma.note.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'desc' } });
+    },
+
+    // The caller's most recent deletion request (or null).
+    myDeletionRequest: async (_parent: unknown, _args: unknown, context: Context) => {
+      const user = await requireUser(context);
+      return prisma.dataDeletionRequest.findFirst({ where: { userId: user.id }, orderBy: { createdAt: 'desc' } });
+    },
+
+    // Pending deletion requests for the site admin to review.
+    deletionRequests: async (_parent: unknown, _args: unknown, context: Context) => {
+      await requireAdmin(context);
+      return prisma.dataDeletionRequest.findMany({ where: { status: 'PENDING' }, orderBy: { createdAt: 'asc' } });
     },
 
     // Responses scoped by the current user's role.
@@ -821,6 +833,75 @@ export const resolvers = {
       return true;
     },
 
+    // A user asks the site admin to erase their data. Creates a pending request
+    // (or returns the existing pending one) — nothing is deleted here.
+    requestDataDeletion: async (_parent: unknown, args: { reason?: string | null }, context: Context) => {
+      const user = await requireUser(context);
+      const existing = await prisma.dataDeletionRequest.findFirst({
+        where: { userId: user.id, status: 'PENDING' },
+      });
+      if (existing) return existing;
+      return prisma.dataDeletionRequest.create({
+        data: { userId: user.id, reason: args.reason?.trim() || null },
+      });
+    },
+
+    // Site admin approves (anonymise) or rejects a deletion request.
+    reviewDeletionRequest: async (_parent: unknown, args: { id: string; approve: boolean }, context: Context) => {
+      await requireAdmin(context);
+      const req = await prisma.dataDeletionRequest.findUnique({ where: { id: args.id } });
+      if (!req || req.status !== 'PENDING') {
+        throw new GraphQLError('Request not found or already handled.', { extensions: { code: 'NOT_FOUND' } });
+      }
+      if (!args.approve) {
+        await prisma.dataDeletionRequest.update({
+          where: { id: req.id }, data: { status: 'REJECTED', reviewedAt: new Date() },
+        });
+        return true;
+      }
+      // Approve → anonymise: unlink the responses (kept for research), remove
+      // personal notes and tokens, and scrub the account's personal details so
+      // nothing traces back to the person and their email is freed.
+      const uid = req.userId;
+      // Capture the real email BEFORE we scrub it, to send a confirmation.
+      const target = await prisma.user.findUnique({ where: { id: uid }, select: { email: true } });
+      const realEmail = target?.email ?? null;
+      await prisma.$transaction([
+        prisma.surveyResponse.updateMany({ where: { userId: uid }, data: { userId: null } }),
+        prisma.note.deleteMany({ where: { userId: uid } }),
+        prisma.verificationToken.deleteMany({ where: { userId: uid } }),
+        prisma.refreshToken.deleteMany({ where: { userId: uid } }),
+        prisma.user.update({
+          where: { id: uid },
+          data: {
+            email: `deleted+${uid}@deleted.invalid`,
+            username: `deleted-${uid}`,
+            passwordHash: null,
+            avatar: 'default',
+            groupId: null,
+            emailVerified: false,
+            deletedAt: new Date(),
+          },
+        }),
+        prisma.dataDeletionRequest.update({
+          where: { id: req.id }, data: { status: 'APPROVED', reviewedAt: new Date() },
+        }),
+      ]);
+
+      // Confirm to the person at their real address (never fail the deletion if
+      // the email can't be sent).
+      if (realEmail && !realEmail.endsWith('@deleted.invalid')) {
+        try {
+          const preview = await sendDataDeletionEmail(realEmail);
+          console.log(`\n[email] Data-deletion confirmation sent to ${realEmail}`);
+          if (preview) console.log(`  Preview the email here: ${preview}\n`);
+        } catch (err) {
+          console.warn(`\n[email] Could not send deletion confirmation:`, (err as Error).message);
+        }
+      }
+      return true;
+    },
+
     // Step 1 of reset: email a reset link. Always returns true so it can't be
     // used to discover which emails are registered.
     requestPasswordReset: async (_parent: unknown, args: { email: string }) => {
@@ -1235,6 +1316,15 @@ export const resolvers = {
   // Convert a Note's Date to an ISO string for the String! schema field.
   Note: {
     createdAt: (parent: { createdAt: Date }) => parent.createdAt.toISOString(),
+  },
+
+  // A deletion request exposes the requester's pseudonym + email (for the admin).
+  DeletionRequest: {
+    createdAt: (parent: { createdAt: Date }) => parent.createdAt.toISOString(),
+    surveyUsername: async (parent: { userId: string }) =>
+      (await prisma.user.findUnique({ where: { id: parent.userId } }))?.surveyUsername ?? '\u2014',
+    email: async (parent: { userId: string }) =>
+      (await prisma.user.findUnique({ where: { id: parent.userId } }))?.email ?? '\u2014',
   },
 
   // Computed fields on Group.

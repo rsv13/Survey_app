@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { useAuth } from '../auth-context'
 import { downloadResponsesCsv } from '../exportCsv'
+import { DELETION_REQUESTS, REVIEW_DELETION } from '../graphql-deletion'
 import {
   MY_GROUPS, MEMBERSHIP, CREATE_GROUP, JOIN_GROUP, LEAVE_GROUP,
   REMOVE_MEMBER, ADD_GROUP_ADMIN, GRANT_GROUP_ADMIN,
@@ -152,6 +153,7 @@ function AdminView({ isSiteAdmin }: { isSiteAdmin: boolean }) {
   return (
     <div className="mt-6 space-y-8">
       {isSiteAdmin && <GrantAdminPanel />}
+      {isSiteAdmin && <DeletionRequestsPanel />}
 
       {/* Create a group */}
       <form onSubmit={onCreate} className="rounded-2xl border border-border bg-surface p-5">
@@ -293,5 +295,60 @@ function GrantAdminPanel() {
       </div>
       {msg && <p className="mt-3 text-sm text-ink-2">{msg}</p>}
     </form>
+  )
+}
+
+// Site-admin only: review and action GDPR data-deletion requests.
+type DelReq = { id: string; reason: string | null; status: string; createdAt: string; surveyUsername: string; email: string }
+type DelReqData = { deletionRequests: DelReq[] }
+function DeletionRequestsPanel() {
+  const { data, loading, refetch } = useQuery<DelReqData>(DELETION_REQUESTS, { fetchPolicy: 'cache-and-network' })
+  const [review] = useMutation(REVIEW_DELETION)
+  const [busyId, setBusyId] = useState('')
+  const requests = data?.deletionRequests ?? []
+
+  async function act(id: string, approve: boolean) {
+    setBusyId(id)
+    try { await review({ variables: { id, approve } }); await refetch() }
+    finally { setBusyId('') }
+  }
+
+  return (
+    <section className="rounded-2xl border border-border bg-surface p-5">
+      <h2 className="text-lg font-semibold text-ink">Data-deletion requests</h2>
+      <p className="mt-1 text-sm text-ink-2">
+        Approving anonymises the person: their account details are removed and their survey responses are
+        unlinked (kept for research, no longer identifying them). This can’t be undone.
+      </p>
+      {loading && requests.length === 0 ? (
+        <p className="mt-4 text-sm text-muted">Loading…</p>
+      ) : requests.length === 0 ? (
+        <p className="mt-4 text-sm text-muted">No pending requests.</p>
+      ) : (
+        <ul className="mt-4 space-y-3">
+          {requests.map((r) => (
+            <li key={r.id} className="rounded-xl border border-border bg-surface-2 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-mono text-sm text-ink">{r.surveyUsername}</p>
+                  <p className="truncate text-xs text-muted">{r.email}</p>
+                  {r.reason && <p className="mt-1 text-sm text-ink-2">“{r.reason}”</p>}
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button onClick={() => act(r.id, true)} disabled={busyId === r.id}
+                    className="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-strong disabled:opacity-60">
+                    Approve
+                  </button>
+                  <button onClick={() => act(r.id, false)} disabled={busyId === r.id}
+                    className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-ink hover:border-calm disabled:opacity-60">
+                    Reject
+                  </button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }

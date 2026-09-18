@@ -4,6 +4,7 @@ import { useQuery, useMutation } from '@apollo/client/react'
 import { PROFILE, CHANGE_PASSWORD, UPDATE_AVATAR } from '../graphql-profile'
 import { SURVEY_ELIGIBILITY } from '../graphql-survey'
 import { MY_NOTES, ADD_NOTE, DELETE_NOTE } from '../graphql-notes'
+import { MY_DELETION_REQUEST, REQUEST_DELETION } from '../graphql-deletion'
 
 type Data = {
   me: {
@@ -106,6 +107,7 @@ export default function Profile() {
       <SurveyActivity />
       <Notes />
       <Security />
+      <DataSection />
     </div>
   )
 }
@@ -280,5 +282,65 @@ function ChangePassword() {
         {busy ? 'Saving…' : 'Change password'}
       </button>
     </form>
+  )
+}
+
+// ---- Your data: request erasure (goes to a site admin, nothing deleted here) ----
+type DelData = { myDeletionRequest: { id: string; status: string; createdAt: string } | null }
+function DataSection() {
+  const { data, refetch } = useQuery<DelData>(MY_DELETION_REQUEST, { fetchPolicy: 'cache-and-network' })
+  const [requestDeletion] = useMutation(REQUEST_DELETION)
+  const [confirming, setConfirming] = useState(false)
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const req = data?.myDeletionRequest
+  const pending = req?.status === 'PENDING'
+
+  async function submit() {
+    setBusy(true)
+    try {
+      await requestDeletion({ variables: { reason: reason.trim() || null } })
+      setConfirming(false); setReason('')
+      await refetch()
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <section className="mt-4 rounded-2xl border border-border bg-surface p-5">
+      <h2 className="text-lg font-semibold text-ink">Your data</h2>
+      {pending ? (
+        <p className="mt-2 rounded-lg bg-surface-2 px-4 py-3 text-sm text-ink-2">
+          Your data-deletion request is awaiting review by a site admin. This can take up to 30 days. You’ll keep
+          access until it’s actioned, and we’ll email you at your address once it’s complete.
+        </p>
+      ) : !confirming ? (
+        <>
+          <p className="mt-1 text-sm text-muted">
+            You can ask a site admin to erase your personal data. Requests are actioned within 30 days. Your survey
+            responses are kept for research but anonymised so they no longer identify you, and we’ll email you a
+            confirmation once it’s done.
+          </p>
+          <button onClick={() => setConfirming(true)}
+            className="mt-3 rounded-xl border border-border px-4 py-2 text-sm font-semibold text-brand-strong hover:border-brand">
+            Request data deletion
+          </button>
+        </>
+      ) : (
+        <div className="mt-2 rounded-xl border border-border bg-surface-2 p-4">
+          <p className="text-sm text-ink">Send a data-deletion request to the site admin?</p>
+          <p className="mt-1 text-xs text-muted">Nothing is deleted now — an admin reviews and actions it, within 30 days.</p>
+          <textarea rows={2} className="mt-3 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-calm"
+            placeholder="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <div className="mt-3 flex gap-2">
+            <button onClick={submit} disabled={busy}
+              className="rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-strong disabled:opacity-60">
+              {busy ? 'Sending…' : 'Send request'}
+            </button>
+            <button onClick={() => setConfirming(false)} disabled={busy}
+              className="rounded-xl border border-border px-4 py-2 text-sm font-semibold text-ink hover:border-calm">Cancel</button>
+          </div>
+        </div>
+      )}
+    </section>
   )
 }

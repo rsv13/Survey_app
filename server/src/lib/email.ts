@@ -112,6 +112,36 @@ function resetHtml(resetUrl: string): string {
   </div>`
 }
 
+// Confirm to the person that their data-deletion request has been completed.
+export async function sendDataDeletionEmail(to: string): Promise<string | null> {
+  const transporter = await getTransporter()
+  const info = await transporter.sendMail({
+    from: FROM,
+    to,
+    subject: 'Your data has been deleted — South Wales Social Well-being Scale',
+    text:
+      `Your request to delete your data has been completed.\n\n` +
+      `Your personal details and account have been removed. Any survey responses you gave are kept for ` +
+      `research but have been anonymised so they no longer identify you.\n\n` +
+      `You're welcome to sign up again at any time if you'd like to take part in future.`,
+    html: deletionHtml(),
+  })
+  return usingEthereal ? nodemailer.getTestMessageUrl(info) || null : null
+}
+
+function deletionHtml(): string {
+  return `
+  <div style="margin:0;padding:24px;background:#eef2f7;font-family:Arial,Helvetica,sans-serif;color:#1b2430;">
+    <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;padding:32px;">
+      <h1 style="margin:0 0 4px;font-size:20px;color:#0a369d;">South Wales Social Well-being Scale</h1>
+      <p style="margin:0 0 20px;font-size:13px;color:#77839a;">Well-being today for a stronger tomorrow</p>
+      <p style="font-size:15px;line-height:1.5;">Your request to delete your data has been completed.</p>
+      <p style="font-size:14px;line-height:1.5;color:#465264;">Your personal details and account have been removed. Any survey responses you gave are kept for research but have been anonymised so they no longer identify you.</p>
+      <p style="font-size:14px;line-height:1.5;color:#465264;">You're welcome to sign up again at any time if you'd like to take part in future.</p>
+    </div>
+  </div>`
+}
+
 // A simple, on-brand HTML email. Styles are inline because email clients
 // strip out <style> blocks and external CSS.
 function verificationHtml(verifyUrl: string): string {

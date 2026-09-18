@@ -252,6 +252,18 @@ export const typeDefs = `#graphql
     createdAt: String!
   }
 
+  enum DeletionStatus { PENDING APPROVED REJECTED }
+
+  # A GDPR data-deletion request, reviewed by a site admin.
+  type DeletionRequest {
+    id: ID!
+    reason: String
+    status: DeletionStatus!
+    createdAt: String!
+    surveyUsername: String!  # who requested (pseudonym)
+    email: String!           # shown to the reviewing admin
+  }
+
   type Query {
     surveyDefinition: SurveyDefinition!
     me: User
@@ -263,6 +275,8 @@ export const typeDefs = `#graphql
     exportResponsesCsv(groupId: ID, userId: ID): String!  # CSV: whole-group, one participant, or your own data
     myGroups: [Group!]!  # groups the caller administers (ADMIN sees all)
     myNotes: [Note!]!    # your own notes, newest first
+    myDeletionRequest: DeletionRequest   # your current/last deletion request, if any
+    deletionRequests: [DeletionRequest!]!  # ADMIN only — pending requests
   }
 
   type Mutation {
@@ -283,6 +297,8 @@ export const typeDefs = `#graphql
     updateAvatar(avatar: String!): User!                 # pick a preset avatar
     addNote(content: String!): Note!                     # save a personal note
     deleteNote(id: ID!): Boolean!                        # delete one of your notes
+    requestDataDeletion(reason: String): DeletionRequest!  # ask the site admin to erase your data
+    reviewDeletionRequest(id: ID!, approve: Boolean!): Boolean!  # ADMIN — approve (anonymise) or reject
     # --- Password reset (email-based) ---
     requestPasswordReset(email: String!): Boolean!       # always returns true (doesn't reveal if the email exists)
     resetPassword(token: String!, newPassword: String!): AuthPayload!  # set a new password with a valid reset token
