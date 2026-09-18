@@ -7,6 +7,7 @@ import Resources from './pages/Resources'
 import SignIn from './pages/SignIn'
 import SignUp from './pages/SignUp'
 import VerifyEmail from './pages/VerifyEmail'
+import MyResults from './pages/MyResults'
 import { RequireAuth } from './components/RequireAuth'
 
 export const router = createBrowserRouter([
@@ -16,6 +17,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Home /> },
       { path: 'survey', element: <RequireAuth><Survey /></RequireAuth> },
+      { path: 'results', element: <RequireAuth><MyResults /></RequireAuth> },
       { path: 'about', element: <About /> },
       { path: 'resources', element: <Resources /> },
       { path: 'sign-in', element: <SignIn /> },

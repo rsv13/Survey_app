@@ -43,6 +43,14 @@ export function Header() {
               {n.label}
             </NavLink>
           ))}
+          {user && (
+            <NavLink to="/results"
+              className={({ isActive }) =>
+                `text-sm font-semibold ${isActive ? 'text-calm-deep' : 'text-ink-2 hover:text-calm-deep'}`
+              }>
+              My results
+            </NavLink>
+          )}
         </nav>
 
         <div className="ml-auto flex items-center gap-2 md:ml-6">
