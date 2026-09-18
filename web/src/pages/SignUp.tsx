@@ -9,7 +9,6 @@ const label = 'block text-sm font-medium text-ink-2'
 export default function SignUp() {
   const { signUp } = useAuth()
   const navigate = useNavigate()
-  const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -30,7 +29,7 @@ export default function SignUp() {
 
     setBusy(true)
     try {
-      await signUp(username, email, password, inviteCode)
+      await signUp(email, password, inviteCode)
       // Account created — go verify the email. Pass the email so the verify
       // page can greet the user by address.
       navigate('/verify', { state: { email } })
@@ -44,15 +43,9 @@ export default function SignUp() {
   return (
     <div className="mx-auto max-w-md px-5 py-16">
       <h1 className="text-3xl font-semibold text-ink">Create an account</h1>
-      <p className="mt-2 text-ink-2">It only takes a moment.</p>
+      <p className="mt-2 text-ink-2">It only takes a moment. You’ll be given an anonymous participant ID automatically.</p>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-4">
-        <div>
-          <label className={label} htmlFor="username">Username</label>
-          <input id="username" type="text" required autoComplete="username"
-            className={`mt-1 ${field}`} value={username}
-            onChange={(e) => setUsername(e.target.value)} />
-        </div>
         <div>
           <label className={label} htmlFor="email">Email</label>
           <input id="email" type="email" required autoComplete="email"

@@ -15,7 +15,7 @@ import { sendVerificationEmail, sendPasswordResetEmail, sendDataDeletionEmail } 
 import crypto from 'node:crypto';
 
 // Argument shapes (match the schema inputs).
-interface SignUpArgs { input: { username: string; email: string; password: string; inviteCode?: string | null } }
+interface SignUpArgs { input: { email: string; password: string; inviteCode?: string | null } }
 interface SignInArgs { input: { email: string; password: string } }
 interface VerifyArgs { token: string }
 interface SubmitSurveyArgs {
@@ -648,7 +648,7 @@ export const resolvers = {
 
   Mutation: {
     signUp: async (_parent: unknown, args: SignUpArgs) => {
-      const { username, password } = args.input;
+      const { password } = args.input;
       const email = normaliseEmail(args.input.email); // trims + lower-cases + checks format
       validatePassword(password);
 
@@ -666,19 +666,23 @@ export const resolvers = {
         }
         joinGroupId = group.id;
       }
-      const existing = await prisma.user.findFirst({ where: { OR: [{ email }, { username }] } });
+      const existing = await prisma.user.findUnique({ where: { email } });
       if (existing) {
-        throw new GraphQLError('That email or username is already in use.', {
+        throw new GraphQLError('That email is already in use.', {
           extensions: { code: 'BAD_USER_INPUT' },
         });
       }
       const passwordHash = await hashPassword(password);
+      // We don't ask for a username — the survey ID is the anonymous identity.
+      // Create with a unique placeholder, then set both to the survey ID.
+      const tempHandle = `tmp_${crypto.randomBytes(9).toString('hex')}`;
       const created = await prisma.user.create({
-        data: { username, email, passwordHash, surveyUsername: 'PENDING', ...(joinGroupId ? { groupId: joinGroupId } : {}) },
+        data: { username: tempHandle, email, passwordHash, surveyUsername: 'PENDING', ...(joinGroupId ? { groupId: joinGroupId } : {}) },
       });
+      const surveyId = formatSurveyUsername(created.surveyNumber);
       const user = await prisma.user.update({
         where: { id: created.id },
-        data: { surveyUsername: formatSurveyUsername(created.surveyNumber) },
+        data: { username: surveyId, surveyUsername: surveyId },
       });
       const { raw, hash } = createVerificationToken();
       await prisma.verificationToken.create({

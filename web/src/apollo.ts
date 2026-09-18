@@ -1,8 +1,9 @@
 import { ApolloClient, InMemoryCache, HttpLink, ApolloLink } from '@apollo/client'
 import { getToken } from './auth'
 
-// Where the GraphQL API lives in development.
-const httpLink = new HttpLink({ uri: 'http://localhost:4000/' })
+// The GraphQL API URL. Set VITE_API_URL at build time for production;
+// falls back to the local dev server otherwise.
+const httpLink = new HttpLink({ uri: import.meta.env.VITE_API_URL ?? 'http://localhost:4000/' })
 
 // Before every request, attach the login token (if we have one) as a
 // standard "Authorization: Bearer <token>" header. The server reads this

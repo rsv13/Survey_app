@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
+import { useAuth } from '../auth-context'
 import { PROFILE, CHANGE_PASSWORD, UPDATE_AVATAR } from '../graphql-profile'
 import { SURVEY_ELIGIBILITY } from '../graphql-survey'
 import { MY_NOTES, ADD_NOTE, DELETE_NOTE } from '../graphql-notes'
@@ -35,6 +36,7 @@ const fmt = (v: string) =>
   parseDate(v).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
 
 export default function Profile() {
+  const { refreshUser } = useAuth()
   const { data, loading, refetch } = useQuery<Data>(PROFILE, { fetchPolicy: 'cache-and-network' })
   const [updateAvatar] = useMutation(UPDATE_AVATAR)
   const [editingAvatar, setEditingAvatar] = useState(false)
@@ -43,6 +45,7 @@ export default function Profile() {
   async function pickAvatar(a: string) {
     await updateAvatar({ variables: { avatar: a } })
     await refetch()
+    await refreshUser() // keep the header avatar in sync
     setEditingAvatar(false)
   }
 
@@ -50,7 +53,7 @@ export default function Profile() {
   if (!me) return <div className="mx-auto max-w-2xl px-5 py-16 text-brand-strong">Please sign in.</div>
 
   const custom = me.avatar && me.avatar !== 'default'
-  const shownAvatar = custom ? me.avatar : me.username.charAt(0).toUpperCase()
+  const shownAvatar = custom ? me.avatar : me.surveyUsername.charAt(0).toUpperCase()
 
   return (
     <div className="mx-auto max-w-2xl px-5 py-16">
@@ -69,10 +72,10 @@ export default function Profile() {
             </span>
           </button>
           <div className="min-w-0">
-            <p className="text-xl font-semibold text-ink">{me.username}</p>
+            <p className="text-xl font-semibold text-ink">{me.surveyUsername}</p>
             <p className="truncate text-sm text-ink-2">{me.email}</p>
             <p className="mt-1 text-xs text-muted">
-              {ROLE_LABELS[me.role] ?? me.role} · Survey ID {me.surveyUsername}
+              {ROLE_LABELS[me.role] ?? me.role} · your anonymous participant ID
             </p>
           </div>
         </div>

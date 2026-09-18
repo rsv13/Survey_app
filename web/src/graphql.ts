@@ -10,6 +10,7 @@ export const ME = gql`
       email
       role
       emailVerified
+      avatar
     }
   }
 `

@@ -7,6 +7,7 @@ export interface AuthUser {
   email: string
   role: 'NORMAL_USER' | 'GROUP_ADMIN' | 'ADMIN'
   emailVerified: boolean
+  avatar: string
 }
 
 // What useAuth() gives you.
@@ -14,11 +15,12 @@ export interface AuthContextValue {
   user: AuthUser | null
   loading: boolean // true while we check for an existing session on first load
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (username: string, email: string, password: string, inviteCode?: string) => Promise<void>
+  signUp: (email: string, password: string, inviteCode?: string) => Promise<void>
   verifyEmail: (token: string) => Promise<void>
   requestPasswordReset: (email: string) => Promise<void>
   resetPassword: (token: string, newPassword: string) => Promise<void>
   signOut: () => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 // The context itself. The provider (in AuthContext.tsx) fills it in.

@@ -57,15 +57,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await applySession(data.signIn)
   }
 
-  async function signUp(username: string, email: string, password: string, inviteCode?: string) {
+  async function signUp(email: string, password: string, inviteCode?: string) {
     const code = inviteCode?.trim()
     const { data } = await apolloClient.mutate<{ signUp: { id: string } }>({
       mutation: SIGN_UP,
       // Only include inviteCode when they actually entered one.
-      variables: { input: { username, email, password, ...(code ? { inviteCode: code } : {}) } },
+      variables: { input: { email, password, ...(code ? { inviteCode: code } : {}) } },
     })
     if (!data?.signUp) throw new Error('Sign up failed.')
     // No token yet — the user must verify their email next.
+  }
+
+  // Re-fetch the current user (e.g. after they change their avatar).
+  async function refreshUser() {
+    try {
+      const { data } = await apolloClient.query<{ me: AuthUser | null }>({ query: ME, fetchPolicy: 'network-only' })
+      setUser(data?.me ?? null)
+    } catch {
+      // ignore — keep the current user
+    }
   }
 
   async function verifyEmail(token: string) {
@@ -97,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, verifyEmail, requestPasswordReset, resetPassword, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, verifyEmail, requestPasswordReset, resetPassword, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

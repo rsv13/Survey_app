@@ -9,7 +9,10 @@
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
     "db:reset": "prisma migrate reset",
-    "dev": "tsx watch src/index.ts"
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:sample": "tsx prisma/sample-data.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

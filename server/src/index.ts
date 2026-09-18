@@ -11,9 +11,11 @@ import { buildContext, type Context } from './context.js'; // per-request auth c
 // The <Context> tells Apollo (and TypeScript) the shape of context every resolver gets.
 const server = new ApolloServer<Context>({ typeDefs, resolvers });
 
-// Start listening on port 4000. `context` runs on every request to read the token.
+// Listen on the host-provided PORT (e.g. on Render/Railway), falling back to
+// 4000 for local development. `context` runs on every request to read the token.
+const port = Number(process.env.PORT) || 4000;
 const { url } = await startStandaloneServer(server, {
-  listen: { port: 4000 },
+  listen: { port, host: '0.0.0.0' },
   context: buildContext,
 });
 
