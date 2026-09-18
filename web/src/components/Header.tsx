@@ -75,9 +75,9 @@ export function Header() {
           {user ? (
             // Signed in: show the name and a sign-out button.
             <>
-              <span className="hidden text-sm text-ink-2 sm:inline">
+              <Link to="/profile" className="hidden text-sm text-ink-2 hover:text-calm-deep sm:inline">
                 Hi, <span className="font-semibold text-ink">{user.username}</span>
-              </span>
+              </Link>
               <button
                 onClick={onSignOut}
                 className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-ink hover:border-calm"

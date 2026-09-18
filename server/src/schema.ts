@@ -269,5 +269,8 @@ export const typeDefs = `#graphql
     joinGroup(inviteCode: String!): Group!               # any signed-in user joins as a member
     leaveGroup: User!                                    # a member leaves their own group
     removeMember(userId: ID!): User!                     # a Group Admin removes a member from their group
+    # --- Account ---
+    changePassword(currentPassword: String!, newPassword: String!): User!  # change your own password
+    updateAvatar(avatar: String!): User!                 # pick a preset avatar
   }
 `;

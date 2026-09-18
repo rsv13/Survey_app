@@ -714,6 +714,31 @@ export const resolvers = {
       return { token: signAccessToken(user.id), user };
     },
 
+    // Change your own password: confirm the current one, enforce the policy,
+    // then store the new hash.
+    changePassword: async (
+      _parent: unknown,
+      args: { currentPassword: string; newPassword: string },
+      context: Context,
+    ) => {
+      const user = await requireUser(context);
+      if (!user.passwordHash || !(await verifyPassword(args.currentPassword, user.passwordHash))) {
+        throw new GraphQLError('Your current password is incorrect.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+      validatePassword(args.newPassword);
+      const passwordHash = await hashPassword(args.newPassword);
+      return prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+    },
+
+    // Pick a preset avatar (a short key/emoji stored on the user).
+    updateAvatar: async (_parent: unknown, args: { avatar: string }, context: Context) => {
+      const user = await requireUser(context);
+      const avatar = args.avatar.trim().slice(0, 32);
+      return prisma.user.update({ where: { id: user.id }, data: { avatar } });
+    },
+
     // Create a survey response and its answer rows, atomically.
     submitSurvey: async (_parent: unknown, args: SubmitSurveyArgs, context: Context) => {
       const user = await requireUser(context);

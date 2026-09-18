@@ -79,9 +79,9 @@ Survey_app/
 - [x] **Phase 3** — Survey responses: scoring, imputation, subscales, 14-day cooldown
 - [x] **Phase 4** — Groups & authorization: full group lifecycle, role-scoped access
 - [x] **Phase 5** — Analytics + export: role-scoped aggregations (group / participant / demographic) and SPSS-friendly CSV export
-- [ ] **Phase 6** — Frontend foundation (React + Vite + Apollo Client + shadcn/ui)
-- [ ] **Phase 7** — Survey wizard, dashboards, export UI
-- [ ] **Phase 8** — Hardening & deploy
+- [x] **Phase 6** — Frontend foundation: React 19 + Vite + Apollo Client v4, Tailwind v4 "Ocean" theme (light/dark), app shell, routing, auth screens (sign up / email verification / sign in), session restore
+- [x] **Phase 7** — Survey wizard, dashboards & export UI: 14-item guided wizard with cooldown, personal results (score-over-time), group management, analytics dashboard, CSV export (whole-group / per-participant / own), profile & account page (change password, avatar)
+- [ ] **Phase 8** — Hardening & deploy (see `PRE_LAUNCH_CHECKLIST.md`)
 
 ## Dashboard metrics (planned)
 
