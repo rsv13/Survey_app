@@ -52,6 +52,7 @@ export const typeDefs = `#graphql
     username: String!
     email: String!
     password: String!
+    inviteCode: String   # optional — join a group straight away if provided
   }
 
   input SignInInput {

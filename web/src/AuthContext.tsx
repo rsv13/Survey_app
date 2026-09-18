@@ -57,10 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await applySession(data.signIn)
   }
 
-  async function signUp(username: string, email: string, password: string) {
+  async function signUp(username: string, email: string, password: string, inviteCode?: string) {
+    const code = inviteCode?.trim()
     const { data } = await apolloClient.mutate<{ signUp: { id: string } }>({
       mutation: SIGN_UP,
-      variables: { input: { username, email, password } },
+      // Only include inviteCode when they actually entered one.
+      variables: { input: { username, email, password, ...(code ? { inviteCode: code } : {}) } },
     })
     if (!data?.signUp) throw new Error('Sign up failed.')
     // No token yet — the user must verify their email next.

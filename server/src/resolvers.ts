@@ -15,7 +15,7 @@ import { sendVerificationEmail } from './lib/email.js';
 import crypto from 'node:crypto';
 
 // Argument shapes (match the schema inputs).
-interface SignUpArgs { input: { username: string; email: string; password: string } }
+interface SignUpArgs { input: { username: string; email: string; password: string; inviteCode?: string | null } }
 interface SignInArgs { input: { email: string; password: string } }
 interface VerifyArgs { token: string }
 interface SubmitSurveyArgs {
@@ -600,6 +600,21 @@ export const resolvers = {
       const { username, password } = args.input;
       const email = normaliseEmail(args.input.email); // trims + lower-cases + checks format
       validatePassword(password);
+
+      // Optional: if they pasted a group invite code, look it up now so we can
+      // drop them straight into that group. A wrong code fails early (before we
+      // create the account) so they can correct the typo.
+      const inviteCode = args.input.inviteCode?.trim();
+      let joinGroupId: string | null = null;
+      if (inviteCode) {
+        const group = await prisma.group.findUnique({ where: { inviteCode } });
+        if (!group || group.deletedAt) {
+          throw new GraphQLError('That invite code is not valid.', {
+            extensions: { code: 'BAD_USER_INPUT' },
+          });
+        }
+        joinGroupId = group.id;
+      }
       const existing = await prisma.user.findFirst({ where: { OR: [{ email }, { username }] } });
       if (existing) {
         throw new GraphQLError('That email or username is already in use.', {
@@ -608,7 +623,7 @@ export const resolvers = {
       }
       const passwordHash = await hashPassword(password);
       const created = await prisma.user.create({
-        data: { username, email, passwordHash, surveyUsername: 'PENDING' },
+        data: { username, email, passwordHash, surveyUsername: 'PENDING', ...(joinGroupId ? { groupId: joinGroupId } : {}) },
       });
       const user = await prisma.user.update({
         where: { id: created.id },

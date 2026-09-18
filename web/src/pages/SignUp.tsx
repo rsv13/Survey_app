@@ -13,6 +13,7 @@ export default function SignUp() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -29,7 +30,7 @@ export default function SignUp() {
 
     setBusy(true)
     try {
-      await signUp(username, email, password)
+      await signUp(username, email, password, inviteCode)
       // Account created — go verify the email. Pass the email so the verify
       // page can greet the user by address.
       navigate('/verify', { state: { email } })
@@ -76,6 +77,12 @@ export default function SignUp() {
           <input id="confirm" type={showPassword ? 'text' : 'password'} required
             autoComplete="new-password" className={`mt-1 ${field}`} value={confirm}
             onChange={(e) => setConfirm(e.target.value)} />
+        </div>
+        <div>
+          <label className={label} htmlFor="invite">Group invite code <span className="font-normal text-muted">(optional)</span></label>
+          <input id="invite" type="text" className={`mt-1 ${field}`} value={inviteCode}
+            onChange={(e) => setInviteCode(e.target.value)} />
+          <p className="mt-1 text-xs text-muted">Have a code from a researcher? Enter it to join their group now. You can also add it later.</p>
         </div>
 
         {error && (
