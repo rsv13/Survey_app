@@ -13,14 +13,14 @@ const crisis = [
 export default function Resources() {
   return (
     <div className="mx-auto max-w-2xl px-5 py-16">
-      <h1 className="text-3xl font-semibold text-[var(--ink)]">Resources &amp; support</h1>
+      <h1 className="text-3xl font-semibold text-ink">Resources &amp; support</h1>
 
-      <p className="mt-4 text-[var(--ink-2)]">
+      <p className="mt-4 text-ink-2">
         Reading and services that may help you understand the scale and find
         support in your community.
       </p>
 
-      <h2 className="mt-10 text-sm font-semibold uppercase tracking-widest text-[var(--calm-deep)]">
+      <h2 className="mt-10 text-sm font-semibold uppercase tracking-widest text-calm-deep">
         Learn more
       </h2>
       <ul className="mt-4 space-y-3">
@@ -30,7 +30,7 @@ export default function Resources() {
               href={p.href}
               target="_blank"
               rel="noreferrer"
-              className="font-medium text-[var(--calm-deep)] underline-offset-2 hover:underline"
+              className="font-medium text-calm-deep underline-offset-2 hover:underline"
             >
               {p.name}
             </a>
@@ -38,10 +38,10 @@ export default function Resources() {
         ))}
       </ul>
 
-      <h2 className="mt-10 text-sm font-semibold uppercase tracking-widest text-[var(--calm-deep)]">
+      <h2 className="mt-10 text-sm font-semibold uppercase tracking-widest text-calm-deep">
         If you need to talk to someone
       </h2>
-      <p className="mt-4 text-[var(--ink-2)]">
+      <p className="mt-4 text-ink-2">
         If you are struggling or in distress, free and confidential support is
         available at any time.
       </p>
@@ -49,14 +49,14 @@ export default function Resources() {
         {crisis.map((c) => (
           <li
             key={c.name}
-            className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
+            className="rounded-xl border border-border bg-surface px-4 py-3"
           >
-            <span className="font-medium text-[var(--ink)]">{c.name}</span>
-            <span className="ml-2 text-[var(--ink-2)]">{c.detail}</span>
+            <span className="font-medium text-ink">{c.name}</span>
+            <span className="ml-2 text-ink-2">{c.detail}</span>
           </li>
         ))}
       </ul>
-      <p className="mt-6 text-sm text-[var(--muted)]">
+      <p className="mt-6 text-sm text-muted">
         In an emergency, call 999.
       </p>
     </div>

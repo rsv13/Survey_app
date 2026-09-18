@@ -11,6 +11,7 @@ import {
   hashToken,
 } from './lib/auth.js';
 import { normaliseEmail, validatePassword } from './lib/validation.js';
+import { sendVerificationEmail } from './lib/email.js';
 import crypto from 'node:crypto';
 
 // Argument shapes (match the schema inputs).
@@ -604,7 +605,22 @@ export const resolvers = {
           expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24),
         },
       });
-      console.log(`\n[DEV] Verify ${email} with this token:\n  ${raw}\n`);
+      // Build the link the user clicks to confirm their email, then send it.
+      const webUrl = process.env.WEB_URL ?? 'http://localhost:5173';
+      const verifyUrl = `${webUrl}/verify?token=${raw}&email=${encodeURIComponent(email)}`;
+      try {
+        const preview = await sendVerificationEmail(email, verifyUrl);
+        console.log(`\n[email] Verification email sent to ${email}`);
+        if (preview) console.log(`  Preview the email here: ${preview}`);
+        // In dev, also print the direct link so you can verify with one click
+        // straight from the terminal. Never logged in production.
+        if (process.env.NODE_ENV !== 'production') console.log(`  Direct verify link: ${verifyUrl}\n`);
+      } catch (err) {
+        // Never fail signup just because email sending failed — log the link
+        // so you can still complete verification during development.
+        console.warn(`\n[email] Could not send verification email:`, (err as Error).message);
+        console.log(`  [DEV fallback] Verify link: ${verifyUrl}\n`);
+      }
       return user;
     },
 
