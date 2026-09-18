@@ -54,6 +54,9 @@ export default function SignIn() {
               {showPassword ? 'Hide' : 'Show'}
             </button>
           </div>
+          <p className="mt-1 text-right text-xs">
+            <Link to="/forgot-password" className="font-medium text-calm-deep hover:underline">Forgot password?</Link>
+          </p>
         </div>
 
         {error && (

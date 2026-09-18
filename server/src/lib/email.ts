@@ -74,6 +74,44 @@ export async function sendVerificationEmail(
   return usingEthereal ? nodemailer.getTestMessageUrl(info) || null : null
 }
 
+// Send the password-reset email. Returns an Ethereal preview URL in dev.
+export async function sendPasswordResetEmail(
+  to: string,
+  resetUrl: string,
+): Promise<string | null> {
+  const transporter = await getTransporter()
+  const info = await transporter.sendMail({
+    from: FROM,
+    to,
+    subject: 'Reset your password — South Wales Social Well-being Scale',
+    text:
+      `We received a request to reset your SWSWBS password.\n\n` +
+      `Set a new password here:\n${resetUrl}\n\n` +
+      `This link expires in 1 hour. If you didn't request this, you can safely ignore this email — your password won't change.`,
+    html: resetHtml(resetUrl),
+  })
+  return usingEthereal ? nodemailer.getTestMessageUrl(info) || null : null
+}
+
+// The reset email body.
+function resetHtml(resetUrl: string): string {
+  return `
+  <div style="margin:0;padding:24px;background:#eef2f7;font-family:Arial,Helvetica,sans-serif;color:#1b2430;">
+    <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;padding:32px;">
+      <h1 style="margin:0 0 4px;font-size:20px;color:#0a369d;">South Wales Social Well-being Scale</h1>
+      <p style="margin:0 0 20px;font-size:13px;color:#77839a;">Well-being today for a stronger tomorrow</p>
+      <p style="font-size:15px;line-height:1.5;">We received a request to reset your password. Click below to choose a new one.</p>
+      <p style="text-align:center;margin:28px 0;">
+        <a href="${resetUrl}" style="display:inline-block;background:#0a369d;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">Reset my password</a>
+      </p>
+      <p style="font-size:13px;color:#465264;line-height:1.5;">Or paste this link into your browser:<br>
+        <a href="${resetUrl}" style="color:#0a369d;word-break:break-all;">${resetUrl}</a>
+      </p>
+      <p style="font-size:12px;color:#77839a;margin-top:24px;">This link expires in 1 hour. If you didn't request a reset, you can ignore this email — your password won't change.</p>
+    </div>
+  </div>`
+}
+
 // A simple, on-brand HTML email. Styles are inline because email clients
 // strip out <style> blocks and external CSS.
 function verificationHtml(verifyUrl: string): string {

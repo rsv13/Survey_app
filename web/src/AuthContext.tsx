@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { apolloClient } from './apollo'
 import { getToken, setToken, clearToken } from './auth'
-import { ME, SIGN_IN, SIGN_UP, VERIFY_EMAIL } from './graphql'
+import { ME, SIGN_IN, SIGN_UP, VERIFY_EMAIL, REQUEST_PASSWORD_RESET, RESET_PASSWORD } from './graphql'
 import { AuthContext, type AuthUser } from './auth-context'
 
 // The token + user the server returns on a successful sign-in/verify.
@@ -77,6 +77,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await applySession(data.verifyEmail)
   }
 
+  async function requestPasswordReset(email: string) {
+    await apolloClient.mutate({ mutation: REQUEST_PASSWORD_RESET, variables: { email } })
+  }
+
+  async function resetPassword(token: string, newPassword: string) {
+    const { data } = await apolloClient.mutate<{ resetPassword: AuthPayload }>({
+      mutation: RESET_PASSWORD,
+      variables: { token, newPassword },
+    })
+    if (!data?.resetPassword) throw new Error('Reset failed.')
+    await applySession(data.resetPassword)
+  }
+
   async function signOut() {
     clearToken()
     setUser(null)
@@ -84,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, verifyEmail, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, verifyEmail, requestPasswordReset, resetPassword, signOut }}>
       {children}
     </AuthContext.Provider>
   )

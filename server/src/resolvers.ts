@@ -11,7 +11,7 @@ import {
   hashToken,
 } from './lib/auth.js';
 import { normaliseEmail, validatePassword } from './lib/validation.js';
-import { sendVerificationEmail } from './lib/email.js';
+import { sendVerificationEmail, sendPasswordResetEmail } from './lib/email.js';
 import crypto from 'node:crypto';
 
 // Argument shapes (match the schema inputs).
@@ -189,6 +189,12 @@ export const resolvers = {
       return [];
     },
 
+    // A user's own notes, newest first.
+    myNotes: async (_parent: unknown, _args: unknown, context: Context) => {
+      const user = await requireUser(context);
+      return prisma.note.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'desc' } });
+    },
+
     // Responses scoped by the current user's role.
     surveyResponses: async (_parent: unknown, _args: unknown, context: Context) => {
       const user = await requireUser(context);
@@ -206,12 +212,19 @@ export const resolvers = {
     // Can the current user submit now, and if not, when?
     surveyEligibility: async (_parent: unknown, _args: unknown, context: Context) => {
       const user = await requireUser(context);
-      const nextEligible = await getNextEligible(user.id);
+      const last = await prisma.surveyResponse.findFirst({
+        where: { userId: user.id, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+      });
+      const nextEligible = last
+        ? new Date(last.createdAt.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000)
+        : null;
       const canSubmit = !nextEligible || nextEligible <= new Date();
       return {
         canSubmit,
         nextEligibleAt: canSubmit ? null : nextEligible!.toISOString(),
         cooldownDays: COOLDOWN_DAYS,
+        lastSubmittedAt: last ? last.createdAt.toISOString() : null,
       };
     },
         // Aggregated stats for the group/admin dashboard. GROUP_ADMIN or ADMIN only.
@@ -701,14 +714,62 @@ export const resolvers = {
       const { password } = args.input;
       const email = args.input.email.trim().toLowerCase();
       const user = await prisma.user.findUnique({ where: { email } });
-      if (!user || !user.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
+
+      // Unknown email (or an account with no password) — generic error, and
+      // there's no per-account counter to touch.
+      if (!user || !user.passwordHash) {
         throw new GraphQLError('Invalid email or password.', {
           extensions: { code: 'UNAUTHENTICATED' },
         });
       }
+
+      // Already in a cooldown from too many failed attempts — block early.
+      if (user.lockedUntil && user.lockedUntil > new Date()) {
+        throw new GraphQLError(
+          'Too many failed attempts. Please wait a few minutes or reset your password.',
+          { extensions: { code: 'FORBIDDEN' } },
+        );
+      }
+
+      // Wrong password: count the failure and, at the limit, start a cooldown.
+      if (!(await verifyPassword(password, user.passwordHash))) {
+        const MAX_ATTEMPTS = 5;
+        const COOLDOWN_MINUTES = 15;
+        const attempts = user.failedLoginAttempts + 1;
+        if (attempts >= MAX_ATTEMPTS) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              failedLoginAttempts: 0, // reset the counter; the lock now governs
+              lockedUntil: new Date(Date.now() + COOLDOWN_MINUTES * 60 * 1000),
+            },
+          });
+          throw new GraphQLError(
+            'Too many failed attempts. Please wait a few minutes or reset your password.',
+            { extensions: { code: 'FORBIDDEN' } },
+          );
+        }
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { failedLoginAttempts: attempts },
+        });
+        throw new GraphQLError('Invalid email or password.', {
+          extensions: { code: 'UNAUTHENTICATED' },
+        });
+      }
+
+      // Correct password but the email still isn't verified.
       if (!user.emailVerified) {
         throw new GraphQLError('Please verify your email before logging in.', {
           extensions: { code: 'FORBIDDEN' },
+        });
+      }
+
+      // Success — clear any failure state so the counter starts fresh next time.
+      if (user.failedLoginAttempts !== 0 || user.lockedUntil) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { failedLoginAttempts: 0, lockedUntil: null },
         });
       }
       return { token: signAccessToken(user.id), user };
@@ -737,6 +798,74 @@ export const resolvers = {
       const user = await requireUser(context);
       const avatar = args.avatar.trim().slice(0, 32);
       return prisma.user.update({ where: { id: user.id }, data: { avatar } });
+    },
+
+    // Save a personal note/reminder.
+    addNote: async (_parent: unknown, args: { content: string }, context: Context) => {
+      const user = await requireUser(context);
+      const content = args.content.trim();
+      if (!content) {
+        throw new GraphQLError('A note can\u2019t be empty.', { extensions: { code: 'BAD_USER_INPUT' } });
+      }
+      return prisma.note.create({ data: { userId: user.id, content: content.slice(0, 2000) } });
+    },
+
+    // Delete one of your own notes.
+    deleteNote: async (_parent: unknown, args: { id: string }, context: Context) => {
+      const user = await requireUser(context);
+      const note = await prisma.note.findUnique({ where: { id: args.id } });
+      if (!note || note.userId !== user.id) {
+        throw new GraphQLError('Note not found.', { extensions: { code: 'NOT_FOUND' } });
+      }
+      await prisma.note.delete({ where: { id: args.id } });
+      return true;
+    },
+
+    // Step 1 of reset: email a reset link. Always returns true so it can't be
+    // used to discover which emails are registered.
+    requestPasswordReset: async (_parent: unknown, args: { email: string }) => {
+      const email = normaliseEmail(args.email);
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (user) {
+        const { raw, hash } = createVerificationToken();
+        await prisma.verificationToken.create({
+          data: {
+            userId: user.id, tokenHash: hash, type: 'PASSWORD_RESET',
+            expiresAt: new Date(Date.now() + 1000 * 60 * 60), // 1 hour
+          },
+        });
+        const webUrl = process.env.WEB_URL ?? 'http://localhost:5173';
+        const resetUrl = `${webUrl}/reset-password?token=${raw}&email=${encodeURIComponent(email)}`;
+        try {
+          const preview = await sendPasswordResetEmail(email, resetUrl);
+          console.log(`\n[email] Password-reset email sent to ${email}`);
+          if (preview) console.log(`  Preview the email here: ${preview}`);
+          if (process.env.NODE_ENV !== 'production') console.log(`  Direct reset link: ${resetUrl}\n`);
+        } catch (err) {
+          console.warn(`\n[email] Could not send reset email:`, (err as Error).message);
+          console.log(`  [DEV fallback] Reset link: ${resetUrl}\n`);
+        }
+      }
+      return true;
+    },
+
+    // Step 2 of reset: verify the token, set the new password, sign them in.
+    resetPassword: async (_parent: unknown, args: { token: string; newPassword: string }) => {
+      const record = await prisma.verificationToken.findUnique({
+        where: { tokenHash: hashToken(args.token) },
+      });
+      if (!record || record.consumedAt || record.type !== 'PASSWORD_RESET' || record.expiresAt < new Date()) {
+        throw new GraphQLError('Invalid or expired reset link.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+      validatePassword(args.newPassword);
+      const passwordHash = await hashPassword(args.newPassword);
+      const [user] = await prisma.$transaction([
+        prisma.user.update({ where: { id: record.userId }, data: { passwordHash, emailVerified: true } }),
+        prisma.verificationToken.update({ where: { id: record.id }, data: { consumedAt: new Date() } }),
+      ]);
+      return { token: signAccessToken(user.id), user };
     },
 
     // Create a survey response and its answer rows, atomically.
@@ -1103,6 +1232,11 @@ export const resolvers = {
     // The DB gives a Date; the schema field is String!, so convert to ISO text.
     createdAt: (parent: { createdAt: Date }) => parent.createdAt.toISOString(),
   },
+  // Convert a Note's Date to an ISO string for the String! schema field.
+  Note: {
+    createdAt: (parent: { createdAt: Date }) => parent.createdAt.toISOString(),
+  },
+
   // Computed fields on Group.
   Group: {
     // Count members on demand (users whose groupId points at this group).

@@ -122,6 +122,7 @@ export const typeDefs = `#graphql
     canSubmit: Boolean!
     nextEligibleAt: String
     cooldownDays: Int!
+    lastSubmittedAt: String   # when they last submitted (null if never)
   }
 
   # A completed survey submission.
@@ -244,6 +245,13 @@ export const typeDefs = `#graphql
 
   # ---------- Root types ----------
 
+  # A personal note / reminder, private to the user who wrote it.
+  type Note {
+    id: ID!
+    content: String!
+    createdAt: String!
+  }
+
   type Query {
     surveyDefinition: SurveyDefinition!
     me: User
@@ -254,6 +262,7 @@ export const typeDefs = `#graphql
     demographicBreakdown(dimension: DemographicDimension!, groupId: ID): DemographicBreakdown!
     exportResponsesCsv(groupId: ID, userId: ID): String!  # CSV: whole-group, one participant, or your own data
     myGroups: [Group!]!  # groups the caller administers (ADMIN sees all)
+    myNotes: [Note!]!    # your own notes, newest first
   }
 
   type Mutation {
@@ -272,5 +281,10 @@ export const typeDefs = `#graphql
     # --- Account ---
     changePassword(currentPassword: String!, newPassword: String!): User!  # change your own password
     updateAvatar(avatar: String!): User!                 # pick a preset avatar
+    addNote(content: String!): Note!                     # save a personal note
+    deleteNote(id: ID!): Boolean!                        # delete one of your notes
+    # --- Password reset (email-based) ---
+    requestPasswordReset(email: String!): Boolean!       # always returns true (doesn't reveal if the email exists)
+    resetPassword(token: String!, newPassword: String!): AuthPayload!  # set a new password with a valid reset token
   }
 `;

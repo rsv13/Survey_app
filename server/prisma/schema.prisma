@@ -69,6 +69,11 @@ model User {
 
   emailVerified Boolean @default(false) // can't use the app until they confirm their email
 
+  // Brute-force protection: count consecutive failed sign-ins; after too many
+  // we set a short auto-expiring cooldown (lockedUntil) rather than a permanent lock.
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
   responses SurveyResponse[] // every survey this user has submitted
 
   // A confidential, sequential handle (SWSWBS0001...) built from surveyNumber.
@@ -84,6 +89,7 @@ model User {
   // Auth tokens belonging to this user.
   refreshTokens      RefreshToken[]
   verificationTokens VerificationToken[]
+  notes              Note[]             // personal reminders/notes
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -216,4 +222,15 @@ model VerificationToken {
 
   @@index([userId])
   @@index([type])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }

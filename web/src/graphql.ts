@@ -47,3 +47,20 @@ export const SIGN_IN = gql`
     }
   }
 `
+
+// Step 1 of reset: ask for a reset link (always "succeeds").
+export const REQUEST_PASSWORD_RESET = gql`
+  mutation RequestPasswordReset($email: String!) {
+    requestPasswordReset(email: $email)
+  }
+`
+
+// Step 2 of reset: set a new password with the emailed token (signs you in).
+export const RESET_PASSWORD = gql`
+  mutation ResetPassword($token: String!, $newPassword: String!) {
+    resetPassword(token: $token, newPassword: $newPassword) {
+      token
+      user { id username email role emailVerified }
+    }
+  }
+`

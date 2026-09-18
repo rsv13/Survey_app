@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { useAuth } from '../auth-context'
 import { downloadResponsesCsv } from '../exportCsv'
@@ -39,12 +40,14 @@ export default function Groups() {
 
 // ---------------- Normal user: join / leave a group ----------------
 function MemberView() {
+  const navigate = useNavigate()
   const { data, loading, refetch } = useQuery<MembershipData>(MEMBERSHIP, { fetchPolicy: 'cache-and-network' })
   const [joinGroup] = useMutation(JOIN_GROUP)
   const [leaveGroup] = useMutation(LEAVE_GROUP)
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [confirmingLeave, setConfirmingLeave] = useState(false)
 
   const group = data?.me?.group ?? null
 
@@ -66,6 +69,7 @@ function MemberView() {
     setError(''); setBusy(true)
     try {
       await leaveGroup()
+      setConfirmingLeave(false)
       await refetch()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not leave the group.')
@@ -78,6 +82,9 @@ function MemberView() {
 
   return (
     <div className="mt-6">
+      <button onClick={() => navigate(-1)} className="mb-4 text-sm font-semibold text-calm-deep hover:underline">
+        ← Back
+      </button>
       {group ? (
         <div className="rounded-2xl border border-border bg-surface p-5">
           <p className="text-sm text-muted">You’re a member of</p>
@@ -85,7 +92,24 @@ function MemberView() {
           <p className="mt-2 text-sm text-ink-2">
             Your responses are shared (pseudonymously) with this group’s researchers.
           </p>
-          <button onClick={onLeave} disabled={busy} className={`mt-4 ${btnGhost}`}>Leave group</button>
+          {!confirmingLeave ? (
+            <button onClick={() => setConfirmingLeave(true)} disabled={busy} className={`mt-4 ${btnGhost}`}>Leave group</button>
+          ) : (
+            <div className="mt-4 rounded-xl border border-border bg-surface-2 p-4">
+              <p className="text-sm text-ink">Leave <strong>{group.name}</strong>?</p>
+              <p className="mt-1 text-xs text-muted">
+                Your account and your survey results stay with you — leaving only unlinks you from this
+                group. You can rejoin any time with the invite code.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button onClick={onLeave} disabled={busy}
+                  className="rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-strong disabled:opacity-60">
+                  {busy ? 'Leaving…' : 'Yes, leave group'}
+                </button>
+                <button onClick={() => setConfirmingLeave(false)} disabled={busy} className={btnGhost}>Cancel</button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <form onSubmit={onJoin} className="rounded-2xl border border-border bg-surface p-5">

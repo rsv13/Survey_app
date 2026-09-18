@@ -19,6 +19,7 @@ export const SURVEY_ELIGIBILITY = gql`
       canSubmit
       nextEligibleAt
       cooldownDays
+      lastSubmittedAt
     }
   }
 `
