@@ -10,7 +10,7 @@ const partners = [
 
 export function Footer() {
   return (
-    <footer className="mt-16 border-t border-border bg-surface">
+    <footer className="border-t border-border bg-surface">
       <div className="mx-auto max-w-6xl px-5 py-10">
         <p className="text-xs font-semibold uppercase tracking-widest text-muted">In partnership with</p>
 

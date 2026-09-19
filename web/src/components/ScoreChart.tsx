@@ -47,19 +47,25 @@ export function ScoreChart({ points }: { points: Point[] }) {
           strokeLinejoin="round" strokeLinecap="round" />
       )}
 
-      {/* point markers with a native hover tooltip */}
+      {/* point markers with a native hover tooltip (every point) */}
       {points.map((p, i) => (
-        <g key={i}>
-          <circle cx={xFor(i)} cy={yFor(p.score)} r={4.5}
-            fill="var(--calm-deep)" stroke="var(--surface)" strokeWidth={2}>
-            <title>{fmt(p.date)}: {p.score}</title>
-          </circle>
-          {/* x-axis date label */}
-          <text x={xFor(i)} y={H - 10} textAnchor="middle" fontSize={11} fill="var(--muted)">
+        <circle key={i} cx={xFor(i)} cy={yFor(p.score)} r={4.5}
+          fill="var(--calm-deep)" stroke="var(--surface)" strokeWidth={2}>
+          <title>{fmt(p.date)}: {p.score}</title>
+        </circle>
+      ))}
+
+      {/* x-axis date labels — thinned to at most ~6 so they never overlap */}
+      {points.map((p, i) => {
+        const step = Math.max(1, Math.ceil(points.length / 6))
+        const show = i % step === 0 || i === points.length - 1
+        if (!show) return null
+        return (
+          <text key={`lbl-${i}`} x={xFor(i)} y={H - 10} textAnchor="middle" fontSize={11} fill="var(--muted)">
             {fmt(p.date)}
           </text>
-        </g>
-      ))}
+        )
+      })}
 
       {/* direct-label the latest score */}
       {points.length > 0 && (

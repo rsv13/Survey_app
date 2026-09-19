@@ -43,3 +43,23 @@
 
 html, body, #root { min-height: 100%; }
 body { background: var(--plane); color: var(--ink); }
+/* --- Subtle, accessible motion --------------------------------------------
+   Gentle entrance + float animations. All disabled under prefers-reduced-motion. */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes floaty { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+.fade-up   { animation: fadeUp .55s ease-out both; }
+.fade-up-1 { animation: fadeUp .55s ease-out .08s both; }
+.fade-up-2 { animation: fadeUp .55s ease-out .16s both; }
+.fade-up-3 { animation: fadeUp .55s ease-out .24s both; }
+.floaty    { animation: floaty 7s ease-in-out infinite; }
+
+/* A soft reusable lift on hover for cards. */
+.lift { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.lift:hover { transform: translateY(-3px); box-shadow: 0 12px 28px -14px rgba(10,54,157,.35); }
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-up, .fade-up-1, .fade-up-2, .fade-up-3, .floaty { animation: none; }
+  .lift { transition: none; }
+  .lift:hover { transform: none; }
+}

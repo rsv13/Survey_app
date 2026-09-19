@@ -4,6 +4,7 @@ import Home from './pages/Home'
 import Survey from './pages/Survey'
 import About from './pages/About'
 import Resources from './pages/Resources'
+import Contact from './pages/Contact'
 import SignIn from './pages/SignIn'
 import SignUp from './pages/SignUp'
 import VerifyEmail from './pages/VerifyEmail'
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
       { path: 'profile', element: <RequireAuth><Profile /></RequireAuth> },
       { path: 'about', element: <About /> },
       { path: 'resources', element: <Resources /> },
+      { path: 'contact', element: <Contact /> },
       { path: 'sign-in', element: <SignIn /> },
       { path: 'sign-up', element: <SignUp /> },
       { path: 'verify', element: <VerifyEmail /> },
