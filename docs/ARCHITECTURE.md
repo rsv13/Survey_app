@@ -336,7 +336,7 @@ Legend: **[Implemented]** built and tested · **[Deferred]** planned, not yet bu
 ## A. Authentication & identity
 
 - **[Dropped] Google / OAuth sign-in.** The draft (§6.2) kept Google sign-in. We removed it entirely — no `signInWithGoogle`, no `AuthProvider` table in use. Rationale: **confidentiality and data minimisation** — a well-being study should not hand participant identity to a third-party identity provider, and it removes an external dependency, a cost, and an attack surface. Simpler is safer here.
-- **[Implemented] Email + password with email verification.** New since the draft. Sign-up creates a `NORMAL_USER`; a verification token is generated, the **raw** value handed to the user (printed to the dev console for now, as there is no email service yet) while only its **SHA-256 hash** is stored. Verifying the email also logs the user in. Rationale: confirm ownership of the email, and hash-at-rest means a database leak cannot be used to verify or reset an account.
+- **[Implemented] Email + password with email verification.** New since the draft. Sign-up creates a `NORMAL_USER`; a verification token (plus a short 6-digit code) is generated, the **raw** value handed to the user (by email via Resend in production, or printed to the dev console locally) while only its **SHA-256 hash** is stored. Verifying the email also logs the user in. Rationale: confirm ownership of the email, and hash-at-rest means a database leak cannot be used to verify or reset an account.
 - **[Implemented] Single JWT access token (7-day), sent as an `Authorization: Bearer` header, on Apollo Server 5 *standalone*** (`startStandaloneServer`, no Express yet). This is the working auth core we tested end-to-end.
 - **[Deferred] httpOnly access + refresh cookies with rotation, hosted on Express.** The draft's stronger token model (§6.1) is a pre-production hardening step, not abandoned — the `RefreshToken` model is retained for it. Rationale: get a correct, testable auth core first; move to cookies + refresh rotation + Express middleware during the hardening phase.
 
@@ -359,7 +359,7 @@ The draft's Phase 4 was a single line ("create group, invite codes, membership, 
 
 - **[Implemented] Avatars are preloaded personas/emojis, not uploaded photos** (`User.avatar`). The draft had `profilePicture`. Rationale: data minimisation — no real participant images.
 - **[Implemented] Pseudonymisation** via the confidential `surveyUsername` handle, and **consent enforced server-side** (a submission with `consent: false` is rejected), and **soft deletes** so collected data is never destroyed by accident — all as the draft's §7.1 intended.
-- **[Deferred] Right-to-erasure by anonymisation** (a `deleteUser` flow that nulls the user link but keeps the pseudonymised research data) remains the planned approach.
+- **[Implemented] Right-to-erasure by anonymisation** — a user-requested, admin-reviewed deletion flow that anonymises the account (nulls the user link and scrubs personal fields) while keeping the pseudonymised research data, with an email confirmation to the user.
 
 ## E. Deferred hardening (before production)
 
@@ -380,3 +380,51 @@ The draft's Prisma snippet predates the Prisma 7 details we hit in practice: the
 ## Still open — to confirm with the research team
 
 The draft's §15 questions that touch policy remain genuinely open and are **stakeholder decisions**: ethics / data-handling constraints, whether **Welsh-language** provision is required for v1, the exact **demographic field set**, and the **deployment target**. The schema supports all of these; the policy is the research team's to set.
+
+---
+
+# Addendum II — Frontend, Email & Deployment
+
+**Added: 2026-10-10 · Status: reflects the app as deployed**
+
+Since the backend addendum above, the application has been completed and deployed.
+This entry records the decisions that resolved the remaining open questions.
+
+## Frontend — built
+
+The React client (**[Implemented]**) is **React 19 + Vite + Apollo Client v4 +
+Tailwind CSS v4**, with client-side routing, session restore, and light/dark
+theming. It covers the full product: auth screens (sign up, email verification,
+sign in, forgot/reset password), the 14-item survey wizard with the cooldown,
+personal results with a score-over-time chart, group management, the researcher
+analytics dashboard, CSV export, and a profile/account page.
+
+- **[Decided] Component layer — custom, not a library.** The §8.5 open question
+  (shadcn/ui vs. Flowbite) was resolved by building a small, bespoke component set
+  on Tailwind v4 directly, under a custom **"Ocean"** design system (see
+  `docs/FRONTEND_DESIGN.md`). Rationale: full control of look and accessibility, no
+  dependency to track, and a cohesive brand for the study.
+
+## Email — implemented
+
+- **[Implemented] Transactional email via Resend.** Email verification and
+  password reset are sent through **Resend's HTTPS API** (not SMTP — the HTTPS API
+  works on hosts that block outbound SMTP ports, e.g. Render's free tier). Sends
+  run with a short timeout and never block signup. In local dev, with no key set,
+  the app falls back to an Ethereal test inbox.
+- **[Implemented] Verification by code or link.** Each email carries both a 6-digit
+  code (typed on the page) and a one-click link. Codes are attempt-limited (five
+  tries, then a 30-minute cooldown), with a resend option; the link uses a 256-bit
+  token stored only as a hash.
+
+## Deployment & hardening
+
+- **[Implemented] Deployed to Render** via an infrastructure-as-code Blueprint
+  (`render.yaml`): a managed PostgreSQL database, the Node API, and the static web
+  app. The API build runs `prisma migrate deploy`, so migrations apply to the live
+  database on every deploy.
+- **[Implemented] Account lockout** — repeated failed sign-ins trigger a temporary
+  cooldown.
+- **[Deferred, unchanged]** The broader hardening list from addendum E (Zod
+  everywhere, general rate limiting, security headers, disabling introspection in
+  production, an admin audit trail) remains for the pre-launch pass.

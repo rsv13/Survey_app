@@ -104,7 +104,7 @@ for confidentiality and simplicity.
   can only be built after the row exists (the number is database-assigned), so we
   create with a placeholder, read the number back, then update.
 - **Verification tokens**: we generate a random token, hand the **raw** value to the
-  user (logged to the dev console for now, since there is no email service), but
+  user (emailed via Resend in production, or logged to the dev console in local dev), but
   store only its **SHA-256 hash**. So even a database leak can't be used to verify or
   reset an account. `verifyEmail` marks the email verified and logs the user in.
 - **Login tokens (JWT)**: `signAccessToken` signs a token whose `sub` claim is the
@@ -327,8 +327,9 @@ optimisation noted for later.
 
 ## What's next
 
-- **Frontend**: React + Vite + Apollo Client + shadcn/ui — auth screens, the survey
-  wizard with the cooldown timer, dashboards with charts, and the export button.
+- **Frontend** *(built)*: React 19 + Vite + Apollo Client v4 + Tailwind v4, a custom
+  "Ocean" design system — auth screens, the survey wizard with the cooldown timer,
+  dashboards with charts, and the export button.
 - **Hardening before deploy**: httpOnly refresh cookies, input validation, rate
   limiting, and suppressing error stack traces in production
   (`NODE_ENV=production`).

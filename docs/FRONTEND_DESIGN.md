@@ -60,7 +60,7 @@ alone. `--calm-deep` is the link/heading accent, chosen for contrast on each sur
 - Keep **both** themes calm — the dark theme is a soft, low-contrast dark (not pure
   black, not neon accents), designed as its own set rather than a naive inversion.
 
-## Layout & interaction (planned)
+## Layout & interaction
 
 - Survey as a **multi-step wizard** with a progress indicator (better completion,
   per-step validation) rather than one long form.
@@ -71,6 +71,6 @@ alone. `--calm-deep` is the link/heading accent, chosen for contrast on each sur
   respects `prefers-reduced-motion`. Structure copy for future **Welsh** provision
   (i18n-ready) even if v1 ships English-only.
 
-## Stack (from ARCHITECTURE.md)
+## Stack
 
-React + Vite + Apollo Client + shadcn/ui + Tailwind, wired to the existing GraphQL API.
+React 19 + Vite + Apollo Client v4 + Tailwind CSS v4 — a custom "Ocean" component set (no external component library), wired to the GraphQL API.

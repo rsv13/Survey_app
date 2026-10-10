@@ -1,75 +1,30 @@
-# React + TypeScript + Vite
+# SWSWBS — Web (frontend)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The React single-page app for the **South Wales Social Well-being Scale**. It talks
+to the GraphQL API in `../server` and is deployed as a Render static site.
 
-Currently, two official plugins are available:
+- **Stack:** React 19 + Vite + Apollo Client v4 + Tailwind CSS v4 — a custom
+  "Ocean" design system with light & dark modes.
+- **Routes:** home, sign up, email verification, sign in, forgot/reset password,
+  the survey wizard, personal results, groups, analytics, and profile.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Develop
 
-## React Compiler
+From the repo root (recommended — starts the database, API and web together):
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm run dev:all
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Or run just the web app from this folder:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm run dev        # Vite dev server at http://localhost:5173
+npm run build      # type-check + production build to dist/
+npm run preview    # preview the production build
 ```
+
+The app reads the API URL from `VITE_API_URL` (defaults to `http://localhost:4000/`).
+
+See the repo-root `README.md` for full setup, and `docs/FRONTEND_DESIGN.md` for the
+design system.

@@ -38,23 +38,16 @@ services:
       # Your frontend URL, e.g. https://swswbs-web.onrender.com (set after 1st deploy).
       - key: WEB_URL
         sync: false
-      # ---- Email (Resend over SMTP) ----
-      # Points the mailer at Resend. SMTP_PASS is your Resend API key: it is a
-      # secret, so it's entered in the Render dashboard (sync: false) and never
-      # committed. The others aren't secret, so they live here for clarity.
-      - key: SMTP_HOST
-        value: smtp.resend.com
-      - key: SMTP_PORT
-        value: "465"
-      - key: SMTP_SECURE
-        value: "true"
-      - key: SMTP_USER
-        value: resend
+      # ---- Email (Resend HTTPS API) ----
+      # Verification + reset email is sent via Resend's HTTPS API. Provide the
+      # Resend key as a secret (sync: false): RESEND_API_KEY is preferred, and
+      # SMTP_PASS is also accepted (kept here for the existing deploy). The key is
+      # entered in the Render dashboard, never committed.
       - key: SMTP_PASS
         sync: false
-      # Demo sender. Resend's test address only delivers to your own Resend
-      # account email. Swap to "SWSWBS <no-reply@yourdomain>" once you verify a
-      # domain in Resend — no code change, just change this value.
+      # Sender address. Resend's shared test sender (onboarding@resend.dev) only
+      # reaches your own Resend-account email; verify a domain at resend.com/domains
+      # and use an address on it to email anyone — no code change, just this value.
       - key: EMAIL_FROM
         value: "SWSWBS <onboarding@resend.dev>"
 
