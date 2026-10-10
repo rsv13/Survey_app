@@ -8,6 +8,7 @@ import {
   verifyPassword,
   signAccessToken,
   createVerificationToken,
+  createVerificationCode,
   hashToken,
 } from './lib/auth.js';
 import { normaliseEmail, validatePassword } from './lib/validation.js';
@@ -685,27 +686,29 @@ export const resolvers = {
         data: { username: surveyId, surveyUsername: surveyId },
       });
       const { raw, hash } = createVerificationToken();
+      const { code, codeHash } = createVerificationCode();
       await prisma.verificationToken.create({
         data: {
-          userId: user.id, tokenHash: hash, type: 'EMAIL_VERIFICATION',
+          userId: user.id, tokenHash: hash, codeHash, type: 'EMAIL_VERIFICATION',
           expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24),
         },
       });
-      // Build the link the user clicks to confirm their email, then send it.
+      // Build the link the user clicks to confirm their email, then send it
+      // alongside the 6-digit code they can type instead.
       const webUrl = process.env.WEB_URL ?? 'http://localhost:5173';
       const verifyUrl = `${webUrl}/verify?token=${raw}&email=${encodeURIComponent(email)}`;
       try {
-        const preview = await sendVerificationEmail(email, verifyUrl);
+        const preview = await sendVerificationEmail(email, verifyUrl, code);
         console.log(`\n[email] Verification email sent to ${email}`);
         if (preview) console.log(`  Preview the email here: ${preview}`);
-        // In dev, also print the direct link so you can verify with one click
-        // straight from the terminal. Never logged in production.
-        if (process.env.NODE_ENV !== 'production') console.log(`  Direct verify link: ${verifyUrl}\n`);
+        // In dev, also print the link and code so you can verify straight from
+        // the terminal. Never logged in production.
+        if (process.env.NODE_ENV !== 'production') console.log(`  Direct verify link: ${verifyUrl}\n  Code: ${code}\n`);
       } catch (err) {
         // Never fail signup just because email sending failed — log the link
-        // so you can still complete verification during development.
+        // and code so you can still complete verification during development.
         console.warn(`\n[email] Could not send verification email:`, (err as Error).message);
-        console.log(`  [DEV fallback] Verify link: ${verifyUrl}\n`);
+        console.log(`  [DEV fallback] Verify link: ${verifyUrl}\n  [DEV fallback] Code: ${code}\n`);
       }
       return user;
     },
@@ -725,6 +728,118 @@ export const resolvers = {
       ]);
       return { token: signAccessToken(user.id), user };
     },
+    // Verify by typing the 6-digit code from the email (no link click needed).
+    // Five wrong tries on a code triggers a 30-minute cooldown; "resend" issues
+    // a brand-new code, and the email link always works as an escape.
+    verifyEmailCode: async (_parent: unknown, args: { email: string; code: string }) => {
+      const email = normaliseEmail(args.email);
+      const noCode = () =>
+        new GraphQLError('This code is no longer valid. Request a new code, or use the link in your email.', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (!user) throw noCode();
+
+      const token = await prisma.verificationToken.findFirst({
+        where: {
+          userId: user.id,
+          type: 'EMAIL_VERIFICATION',
+          consumedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!token || !token.codeHash) throw noCode();
+
+      const MAX_CODE_ATTEMPTS = 5;
+      const COOLDOWN_MINUTES = 30;
+      const now = new Date();
+
+      // Still in cooldown from a previous run of wrong tries.
+      if (token.lockedUntil && token.lockedUntil > now) {
+        const mins = Math.max(1, Math.ceil((token.lockedUntil.getTime() - now.getTime()) / 60000));
+        throw new GraphQLError(
+          `Too many incorrect attempts. Try again in about ${mins} minute${mins === 1 ? '' : 's'}, request a new code, or click the link in your email.`,
+          { extensions: { code: 'TOO_MANY_ATTEMPTS' } },
+        );
+      }
+
+      // Cooldown just expired — reset the counter and give a fresh run of tries.
+      let attempts = token.attempts;
+      if (token.lockedUntil && token.lockedUntil <= now) {
+        attempts = 0;
+        await prisma.verificationToken.update({
+          where: { id: token.id },
+          data: { attempts: 0, lockedUntil: null },
+        });
+      }
+
+      // Wrong code — count it; start a cooldown if this used up the tries.
+      if (hashToken(args.code.trim()) !== token.codeHash) {
+        const used = attempts + 1;
+        if (used >= MAX_CODE_ATTEMPTS) {
+          await prisma.verificationToken.update({
+            where: { id: token.id },
+            data: { attempts: used, lockedUntil: new Date(now.getTime() + COOLDOWN_MINUTES * 60000) },
+          });
+          throw new GraphQLError(
+            `Too many incorrect attempts. Try again in about ${COOLDOWN_MINUTES} minutes, request a new code, or click the link in your email.`,
+            { extensions: { code: 'TOO_MANY_ATTEMPTS' } },
+          );
+        }
+        await prisma.verificationToken.update({
+          where: { id: token.id },
+          data: { attempts: used },
+        });
+        const left = MAX_CODE_ATTEMPTS - used;
+        throw new GraphQLError(`Incorrect code. ${left} ${left === 1 ? 'try' : 'tries'} left.`, {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      }
+
+      // Correct — verify the account and consume the token.
+      const [verified] = await prisma.$transaction([
+        prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } }),
+        prisma.verificationToken.update({ where: { id: token.id }, data: { consumedAt: now } }),
+      ]);
+      return { token: signAccessToken(verified.id), user: verified };
+    },
+
+    // Re-send a fresh verification email (new code + link). Always returns true
+    // so it can't be used to discover which emails are registered.
+    resendVerification: async (_parent: unknown, args: { email: string }) => {
+      const email = normaliseEmail(args.email);
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (user && !user.emailVerified) {
+        // Invalidate any outstanding verification tokens first.
+        await prisma.verificationToken.updateMany({
+          where: { userId: user.id, type: 'EMAIL_VERIFICATION', consumedAt: null },
+          data: { consumedAt: new Date() },
+        });
+        const { raw, hash } = createVerificationToken();
+        const { code, codeHash } = createVerificationCode();
+        await prisma.verificationToken.create({
+          data: {
+            userId: user.id, tokenHash: hash, codeHash, type: 'EMAIL_VERIFICATION',
+            expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24),
+          },
+        });
+        const webUrl = process.env.WEB_URL ?? 'http://localhost:5173';
+        const verifyUrl = `${webUrl}/verify?token=${raw}&email=${encodeURIComponent(email)}`;
+        try {
+          const preview = await sendVerificationEmail(email, verifyUrl, code);
+          console.log(`\n[email] Verification email re-sent to ${email}`);
+          if (preview) console.log(`  Preview the email here: ${preview}`);
+          if (process.env.NODE_ENV !== 'production') console.log(`  Direct verify link: ${verifyUrl}\n  Code: ${code}\n`);
+        } catch (err) {
+          console.warn(`\n[email] Could not re-send verification email:`, (err as Error).message);
+          console.log(`  [DEV fallback] Verify link: ${verifyUrl}\n  [DEV fallback] Code: ${code}\n`);
+        }
+      }
+      return true;
+    },
+
 
     signIn: async (_parent: unknown, args: SignInArgs) => {
       const { password } = args.input;

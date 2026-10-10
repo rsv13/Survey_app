@@ -38,6 +38,23 @@ export const VERIFY_EMAIL = gql`
   }
 `
 
+// Confirm the email address by typing the 6-digit code (also signs you in).
+export const VERIFY_EMAIL_CODE = gql`
+  mutation VerifyEmailCode($email: String!, $code: String!) {
+    verifyEmailCode(email: $email, code: $code) {
+      token
+      user { id username email role emailVerified }
+    }
+  }
+`
+
+// Re-send a fresh verification email (new code + link). Always "succeeds".
+export const RESEND_VERIFICATION = gql`
+  mutation ResendVerification($email: String!) {
+    resendVerification(email: $email)
+  }
+`
+
 // Log in. Returns a login token + the user (only works once the email
 // has been verified).
 export const SIGN_IN = gql`

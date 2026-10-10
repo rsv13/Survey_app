@@ -1,13 +1,13 @@
-// Sends transactional emails (currently just the email-verification link).
+// Sends transactional emails (email verification and password reset).
 //
 // How it decides where to send:
 //   • If SMTP_HOST is set in the environment, it uses that real mail server
-//     (this is what production will do — e.g. SendGrid or Amazon SES).
+//     (production uses Resend over SMTP).
 //   • If not, it falls back to Ethereal: a free test inbox that captures the
 //     message and hands back a preview URL you open in the browser.
 //
-// Nothing here is throwaway. Going live means setting the SMTP_* env vars —
-// the template, token and link below are exactly what real users receive.
+// Going live means setting the SMTP_* env vars — the templates, tokens, codes
+// and links below are exactly what real users receive.
 
 import nodemailer, { type Transporter } from 'nodemailer'
 
@@ -54,11 +54,13 @@ async function getTransporter(): Promise<Transporter> {
 // Who the email appears to come from. Override with EMAIL_FROM in production.
 const FROM = process.env.EMAIL_FROM ?? 'SWSWBS <no-reply@swswbs.local>'
 
-// Send the verification email. Returns an Ethereal preview URL in dev, or null
-// when sending through a real server (there's nothing to preview then).
+// Send the verification email. It carries BOTH a 6-digit code (type it on the
+// verification page) and a one-click link — the user can use whichever they
+// prefer. Returns an Ethereal preview URL in dev, or null with a real server.
 export async function sendVerificationEmail(
   to: string,
   verifyUrl: string,
+  code: string,
 ): Promise<string | null> {
   const transporter = await getTransporter()
   const info = await transporter.sendMail({
@@ -67,9 +69,10 @@ export async function sendVerificationEmail(
     subject: 'Confirm your email — South Wales Social Well-being Scale',
     text:
       `Welcome to the SWSWBS survey.\n\n` +
-      `Please confirm your email address to finish signing up:\n${verifyUrl}\n\n` +
-      `This link expires in 24 hours. If you didn't create an account, you can ignore this email.`,
-    html: verificationHtml(verifyUrl),
+      `Enter this 6-digit code on the verification page:\n\n    ${code}\n\n` +
+      `Or confirm your email in one click with this link:\n${verifyUrl}\n\n` +
+      `The code and link expire in 24 hours. If you didn't create an account, you can ignore this email.`,
+    html: verificationHtml(verifyUrl, code),
   })
   return usingEthereal ? nodemailer.getTestMessageUrl(info) || null : null
 }
@@ -142,22 +145,25 @@ function deletionHtml(): string {
   </div>`
 }
 
-// A simple, on-brand HTML email. Styles are inline because email clients
-// strip out <style> blocks and external CSS.
-function verificationHtml(verifyUrl: string): string {
+// The verification email body — shows the code prominently, with the one-click
+// button underneath. Styles are inline because email clients strip <style>.
+function verificationHtml(verifyUrl: string, code: string): string {
   return `
   <div style="margin:0;padding:24px;background:#eef2f7;font-family:Arial,Helvetica,sans-serif;color:#1b2430;">
     <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;padding:32px;">
       <h1 style="margin:0 0 4px;font-size:20px;color:#0a369d;">South Wales Social Well-being Scale</h1>
       <p style="margin:0 0 20px;font-size:13px;color:#77839a;">Well-being today for a stronger tomorrow</p>
-      <p style="font-size:15px;line-height:1.5;">Thanks for signing up. Please confirm your email address to activate your account.</p>
-      <p style="text-align:center;margin:28px 0;">
+      <p style="font-size:15px;line-height:1.5;">Thanks for signing up. Confirm your email with the code below — or the button underneath.</p>
+      <p style="margin:24px 0 6px;font-size:13px;color:#77839a;">Your verification code</p>
+      <p style="margin:0 0 4px;font-size:34px;font-weight:bold;letter-spacing:8px;color:#0a369d;">${code}</p>
+      <p style="margin:0 0 24px;font-size:12px;color:#77839a;">Enter this on the verification page.</p>
+      <p style="text-align:center;margin:8px 0 24px;">
         <a href="${verifyUrl}" style="display:inline-block;background:#0a369d;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">Verify my email</a>
       </p>
       <p style="font-size:13px;color:#465264;line-height:1.5;">Or paste this link into your browser:<br>
         <a href="${verifyUrl}" style="color:#0a369d;word-break:break-all;">${verifyUrl}</a>
       </p>
-      <p style="font-size:12px;color:#77839a;margin-top:24px;">This link expires in 24 hours. If you didn't create an account, you can safely ignore this email.</p>
+      <p style="font-size:12px;color:#77839a;margin-top:24px;">The code and link expire in 24 hours. If you didn't create an account, you can safely ignore this email.</p>
     </div>
   </div>`
 }

@@ -32,10 +32,12 @@ export default function ForgotPassword() {
             If an account exists for <strong>{email}</strong>, we’ve sent it a link to reset the password.
             Please check your inbox.
           </p>
-          <div className="mt-4 rounded-lg border border-border bg-surface-2 px-4 py-3 text-sm text-ink-2">
-            <strong className="text-ink">Development note:</strong> open the reset link from the
-            <em> server</em> terminal (or the Ethereal preview) to continue.
-          </div>
+          {import.meta.env.DEV && (
+            <div className="mt-4 rounded-lg border border-border bg-surface-2 px-4 py-3 text-sm text-ink-2">
+              <strong className="text-ink">Development note:</strong> open the reset link from the
+              <em> server</em> terminal (or the Ethereal preview) to continue.
+            </div>
+          )}
           <p className="mt-6 text-sm text-ink-2">
             <Link to="/sign-in" className="font-medium text-calm-deep hover:underline">← Back to sign in</Link>
           </p>

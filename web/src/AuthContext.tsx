@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { apolloClient } from './apollo'
 import { getToken, setToken, clearToken } from './auth'
-import { ME, SIGN_IN, SIGN_UP, VERIFY_EMAIL, REQUEST_PASSWORD_RESET, RESET_PASSWORD } from './graphql'
+import { ME, SIGN_IN, SIGN_UP, VERIFY_EMAIL, VERIFY_EMAIL_CODE, RESEND_VERIFICATION, REQUEST_PASSWORD_RESET, RESET_PASSWORD } from './graphql'
 import { AuthContext, type AuthUser } from './auth-context'
 
 // The token + user the server returns on a successful sign-in/verify.
@@ -87,6 +87,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await applySession(data.verifyEmail)
   }
 
+  // Verify by typing the 6-digit code from the email. Also signs you in.
+  async function verifyEmailCode(email: string, code: string) {
+    const { data } = await apolloClient.mutate<{ verifyEmailCode: AuthPayload }>({
+      mutation: VERIFY_EMAIL_CODE,
+      variables: { email, code },
+    })
+    if (!data?.verifyEmailCode) throw new Error('Verification failed.')
+    await applySession(data.verifyEmailCode)
+  }
+
+  // Ask for a fresh verification email (new code + link).
+  async function resendVerification(email: string) {
+    await apolloClient.mutate({ mutation: RESEND_VERIFICATION, variables: { email } })
+  }
+
   async function requestPasswordReset(email: string) {
     await apolloClient.mutate({ mutation: REQUEST_PASSWORD_RESET, variables: { email } })
   }
@@ -107,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, verifyEmail, requestPasswordReset, resetPassword, signOut, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, verifyEmail, verifyEmailCode, resendVerification, requestPasswordReset, resetPassword, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

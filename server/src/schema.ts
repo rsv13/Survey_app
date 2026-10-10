@@ -281,6 +281,8 @@ export const typeDefs = `#graphql
   type Mutation {
     signUp(input: SignUpInput!): User!
     verifyEmail(token: String!): AuthPayload!
+    verifyEmailCode(email: String!, code: String!): AuthPayload!  # verify by typing the 6-digit code from the email
+    resendVerification(email: String!): Boolean!                 # email a fresh code + link (always returns true)
     signIn(input: SignInInput!): AuthPayload!
     submitSurvey(input: SubmitSurveyInput!): SurveyResponse! # create a response + its answers
     # --- Groups ---

@@ -219,7 +219,10 @@ model VerificationToken {
   type       TokenType // EMAIL_VERIFICATION or PASSWORD_RESET
   expiresAt  DateTime
   consumedAt DateTime? // set once used, so it can't be reused
-  createdAt  DateTime  @default(now())
+  codeHash    String?   // hashed short code the user can type instead of clicking the link
+  attempts    Int       @default(0) // wrong-code entries; locks after too many
+  lockedUntil DateTime? // cooldown: no code attempts allowed until this time
+  createdAt   DateTime  @default(now())
 
   @@index([userId])
   @@index([type])

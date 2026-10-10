@@ -54,3 +54,10 @@ export function createVerificationToken(): { raw: string; hash: string } {
 export function hashToken(raw: string): string {
   return crypto.createHash('sha256').update(raw).digest('hex');
 }
+// A short numeric code (6 digits) the user can type in instead of clicking the
+// verification link. Stored hashed, like the token above, and rate-limited on
+// the way in so the small code space can't be brute-forced.
+export function createVerificationCode(): { code: string; codeHash: string } {
+  const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
+  return { code, codeHash: hashToken(code) };
+}
